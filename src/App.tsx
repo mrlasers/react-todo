@@ -14,12 +14,12 @@ function App() {
 
   const addNewTask = (task: PartialTask) => {
     const t: Task = {
-      title: '',
       description: '',
       dueDate: '',
       status: 'incomplete',
       assignedTo: '',
       id: nextId,
+      ...task,
     }
     setTasks([...tasks, t])
     setNextId(nextId + 1)

@@ -31,7 +31,9 @@ const TaskCards: React.FC<{
   return (
     <ul className='task-list'>
       {tasks.map((task) => {
-        return <TaskCard task={task} onChange={onChange} />
+        return (
+          <TaskCard key={`task-${task.id}`} task={task} onChange={onChange} />
+        )
       })}
     </ul>
   )
