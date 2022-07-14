@@ -3,19 +3,14 @@ import * as React from 'react'
 
 import { useState, useEffect, useReducer, FC } from 'react'
 
-type NewTaskProps = {
-  onNewTask: (task: Task) => void
-}
+import { PartialTask } from '../types'
 
-export type Task = {
-  title: string
-  description?: string
-  dueDate?: string
-  assignedTo?: string
+type NewTaskProps = {
+  onNewTask: (task: PartialTask) => void
 }
 
 const NewTask: FC<NewTaskProps> = (props) => {
-  const [newTask, setNewTask] = useState<Task>({ title: '' })
+  const [newTask, setNewTask] = useState<PartialTask>({ title: '' })
 
   const handleChange = (
     e:
