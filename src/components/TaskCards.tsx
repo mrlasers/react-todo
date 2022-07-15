@@ -4,10 +4,18 @@ import { Task } from '../types'
 
 import './TaskCards.css'
 
-const TaskCard: React.FC<{ task: Task; onChange?: (task: Task) => void }> = ({
-  task,
-  onChange,
-}) => {
+const TaskCard: React.FC<{
+  task: Task
+  onDelete?: (id: number) => void
+  onChange?: (task: Task) => void
+}> = ({ task, onChange, onDelete }) => {
+  const handleDelete = (e: React.ChangeEvent<any>) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    onDelete && onDelete(task.id)
+  }
+
   return (
     <li
       onClick={() =>
@@ -18,8 +26,16 @@ const TaskCard: React.FC<{ task: Task; onChange?: (task: Task) => void }> = ({
         })
       }
       className={task.status}>
-      <div className='title'>{task.title}</div>
-      <div className='description'>{task.description ?? ''}</div>
+      <div className='data'>
+        <div className='title'>
+          {task.title} ({task.id})
+        </div>
+        <div className='description'>{task.description ?? ''}</div>
+        <div className='due-date'>{task.dueDate}</div>
+      </div>
+      <div className='tools'>
+        <span onClick={handleDelete}>🗑</span>
+      </div>
     </li>
   )
 }
@@ -27,12 +43,18 @@ const TaskCard: React.FC<{ task: Task; onChange?: (task: Task) => void }> = ({
 const TaskCards: React.FC<{
   tasks: Task[]
   onChange?: (task: Task) => void
-}> = ({ tasks, onChange }) => {
+  onDelete?: (id: number) => void
+}> = ({ tasks, onChange, onDelete }) => {
   return (
     <ul className='task-list'>
       {tasks.map((task) => {
         return (
-          <TaskCard key={`task-${task.id}`} task={task} onChange={onChange} />
+          <TaskCard
+            key={`task-${task.id}`}
+            task={task}
+            onDelete={onDelete}
+            onChange={onChange}
+          />
         )
       })}
     </ul>

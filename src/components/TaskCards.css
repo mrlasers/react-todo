@@ -5,13 +5,21 @@ ul.task-list {
 }
 
 ul.task-list li {
-  border: 1px solid red;
+  /* border: 1px solid red; */
+  background-color: #292929;
+  color: #ccc;
   text-align: left;
   padding: 0.5em;
   cursor: pointer;
+  display: flex;
+  justify-content: space-between;
 }
 
 ul.task-list li.complete {
+  background-color: #393939;
+}
+
+ul.task-list li.complete .data {
   text-decoration: line-through;
   color: #999;
 }
