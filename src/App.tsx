@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer } from 'react'
-import reactLogo from './assets/react.svg'
+// import reactLogo from './assets/react.svg'
 import './App.css'
 
 import { Task, PartialTask } from './types'
@@ -81,14 +81,21 @@ function App() {
   }
 
   return (
-    <div className='App'>
-      <NewTask onNewTask={addNewTask} />
-      <TaskCards
-        tasks={state.tasks}
-        onDelete={deleteTask}
-        onChange={updateTask}
-      />
-    </div>
+    <>
+      <main className='App'>
+        <NewTask onNewTask={addNewTask} />
+        <TaskCards
+          tasks={state.tasks}
+          onDelete={deleteTask}
+          onChange={updateTask}
+        />
+      </main>
+      <footer>
+        <a href='https://www.flaticon.com/free-icons/to-do' title='to-do icons'>
+          To-do icons created by Freepik - Flaticon
+        </a>
+      </footer>
+    </>
   )
 }
 
