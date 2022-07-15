@@ -1,9 +1,11 @@
-import './NewTask.css'
-import * as React from 'react'
+import './NewTask.css';
 
-import { useState, useRef, useEffect, useReducer, FC } from 'react'
-import { nanoid } from 'nanoid'
-import { PartialTask, Task } from '../types'
+import { nanoid } from 'nanoid';
+import * as React from 'react';
+
+import { PartialTask, Task } from '../types';
+
+const { useState, useRef } = React
 
 type NewTaskProps = {
   onNewTask: (task: PartialTask) => void
@@ -19,7 +21,7 @@ const makeNewTask = (): Task => ({
   createdAt: new Date().toISOString(),
 })
 
-const NewTask: FC<NewTaskProps> = (props) => {
+const NewTask: React.FC<NewTaskProps> = (props) => {
   const [newTask, setNewTask] = useState<Task>(makeNewTask())
   const newTaskTitleElement = useRef<HTMLInputElement | null>(null)
 
@@ -78,7 +80,7 @@ const NewTask: FC<NewTaskProps> = (props) => {
         />
         <input
           type='text'
-          name='project'
+          name='assignedTo'
           placeholder='Who do?'
           onChange={handleChange}
           value={newTask.assignedTo}
