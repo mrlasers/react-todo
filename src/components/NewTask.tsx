@@ -16,6 +16,7 @@ const makeNewTask = (): Task => ({
   dueDate: '',
   id: nanoid(),
   status: 'incomplete',
+  createdAt: new Date().toISOString(),
 })
 
 const NewTask: FC<NewTaskProps> = (props) => {
