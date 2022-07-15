@@ -15,6 +15,14 @@ ul.task-list li {
   justify-content: space-between;
 }
 
+.tools span {
+  visibility: hidden;
+}
+
+ul.task-list li:hover .tools span {
+  visibility: visible;
+}
+
 ul.task-list li.complete {
   background-color: #393939;
 }

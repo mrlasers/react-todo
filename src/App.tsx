@@ -22,9 +22,7 @@ type Action =
       payload: number
     }
 
-const initialState = JSON.parse(
-  localStorage.getItem('todo-state') ?? `{nextId: 0, tasks: []}`
-)
+const initialState = localStorage.getItem('todo-state')
 
 const stateReducer = (state: State, action: Action): State => {
   switch (action.type) {
@@ -62,7 +60,10 @@ const stateReducer = (state: State, action: Action): State => {
 }
 
 function App() {
-  const [state, dispatch] = useReducer(stateReducer, initialState)
+  const [state, dispatch] = useReducer(
+    stateReducer,
+    initialState ? JSON.parse(initialState) : { nextId: 0, tasks: [] }
+  )
 
   useEffect(() => {
     localStorage.setItem('todo-state', JSON.stringify(state))

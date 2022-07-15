@@ -39,3 +39,27 @@
 .read-the-docs {
   color: #888;
 }
+
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body * {
+  box-sizing: inherit;
+}
+
+#root {
+  /* border: 3px dotted red; */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
