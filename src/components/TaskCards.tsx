@@ -6,7 +6,7 @@ import './TaskCards.css'
 
 const TaskCard: React.FC<{
   task: Task
-  onDelete?: (id: number) => void
+  onDelete?: (id: string) => void
   onChange?: (task: Task) => void
 }> = ({ task, onChange, onDelete }) => {
   const handleDelete = (e: React.ChangeEvent<any>) => {
@@ -27,9 +27,7 @@ const TaskCard: React.FC<{
       }
       className={task.status}>
       <div className='data'>
-        <div className='title'>
-          {task.title} ({task.id})
-        </div>
+        <div className='title'>{task.title}</div>
         <div className='description'>{task.description ?? ''}</div>
         <div className='due-date'>{task.dueDate}</div>
       </div>
@@ -43,7 +41,7 @@ const TaskCard: React.FC<{
 const TaskCards: React.FC<{
   tasks: Task[]
   onChange?: (task: Task) => void
-  onDelete?: (id: number) => void
+  onDelete?: (id: string) => void
 }> = ({ tasks, onChange, onDelete }) => {
   return (
     <ul className='task-list'>

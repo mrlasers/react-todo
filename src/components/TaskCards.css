@@ -13,6 +13,7 @@ ul.task-list li {
   cursor: pointer;
   display: flex;
   justify-content: space-between;
+  gap: 1em;
 }
 
 .tools span {

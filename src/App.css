@@ -1,10 +1,37 @@
 #root {
   max-width: 1280px;
+  width: clamp(320px, 50%, 600px);
+  min-height: 100vh;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem 2rem;
   text-align: center;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  /* background-color: papayawhip; */
 }
 
+header {
+  background-color: red;
+  /* padding: 1rem; */
+}
+
+footer {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 0 0 0.75em 0.75em;
+  display: flex;
+  place-content: center;
+  padding: 0.5em 0.5em 0.25em;
+  margin-top: auto;
+}
+
+footer a {
+  display: inline-block;
+  margin: 0;
+}
+
+/* 
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -51,15 +78,23 @@ body * {
 }
 
 #root {
-  /* border: 3px dotted red; */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 0.5em;
+}
+
+header {
+  background-color: red;
+}
+
+footer {
+  margin-top: auto;
 }
 
 .App {
   display: flex;
   flex-direction: column;
   gap: 1em;
-}
+} */

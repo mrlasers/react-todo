@@ -1,5 +1,14 @@
-form {
+form,
+.more {
   display: flex;
   flex-direction: column;
   gap: 1em;
+}
+
+.more {
+  visibility: collapse;
+}
+
+.more.show {
+  visibility: visible;
 }

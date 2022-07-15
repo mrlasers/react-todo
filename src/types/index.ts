@@ -4,7 +4,8 @@ export type PartialTask = {
   dueDate?: string
   assignedTo?: string
   status?: 'complete' | 'incomplete'
-  id?: number
+  id?: string
+  createdAt?: string
 }
 
 export type Task = Required<PartialTask>

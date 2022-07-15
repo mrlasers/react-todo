@@ -5,9 +5,11 @@ import './App.css'
 import { Task, PartialTask } from './types'
 import NewTask from './components/NewTask'
 import TaskCards from './components/TaskCards'
+import Navbar from './components/Navbar'
+import { nanoid } from 'nanoid'
 
 type State = {
-  nextId: number
+  nextId: string
   tasks: Task[]
 }
 
@@ -19,7 +21,7 @@ type Action =
     }
   | {
       type: 'deleteTask'
-      payload: number
+      payload: string | null
     }
 
 const initialState = localStorage.getItem('todo-state')
@@ -31,7 +33,7 @@ const stateReducer = (state: State, action: Action): State => {
     case 'addTask':
       return {
         ...state,
-        nextId: state.nextId + 1,
+        nextId: nanoid(),
         tasks: [
           ...state.tasks,
           {
@@ -39,7 +41,8 @@ const stateReducer = (state: State, action: Action): State => {
             dueDate: '',
             status: 'incomplete',
             assignedTo: '',
-            id: state.nextId + 1,
+            id: state.nextId,
+            createdAt: new Date().toISOString(),
             ...action.payload,
           },
         ],
@@ -52,10 +55,12 @@ const stateReducer = (state: State, action: Action): State => {
         }),
       }
     case 'deleteTask':
-      return {
-        ...state,
-        tasks: state.tasks.filter((task) => task.id !== action.payload),
-      }
+      return action.payload === null
+        ? { ...state, tasks: [] }
+        : {
+            ...state,
+            tasks: state.tasks.filter((task) => task.id !== action.payload),
+          }
   }
 }
 
@@ -77,12 +82,15 @@ function App() {
     dispatch({ type: 'updateTask', payload: task })
   }
 
-  const deleteTask = (id: number) => {
+  const deleteTask = (id: string | null) => {
     dispatch({ type: 'deleteTask', payload: id })
   }
 
   return (
     <>
+      <header>
+        <Navbar onDeleteAll={() => deleteTask(null)} />
+      </header>
       <main className='App'>
         <NewTask onNewTask={addNewTask} />
         <TaskCards

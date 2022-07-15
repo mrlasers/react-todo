@@ -1,16 +1,26 @@
 import './NewTask.css'
 import * as React from 'react'
 
-import { useState, useEffect, useReducer, FC } from 'react'
-
-import { PartialTask } from '../types'
+import { useState, useRef, useEffect, useReducer, FC } from 'react'
+import { nanoid } from 'nanoid'
+import { PartialTask, Task } from '../types'
 
 type NewTaskProps = {
   onNewTask: (task: PartialTask) => void
 }
 
+const makeNewTask = (): Task => ({
+  title: '',
+  description: '',
+  assignedTo: '',
+  dueDate: '',
+  id: nanoid(),
+  status: 'incomplete',
+})
+
 const NewTask: FC<NewTaskProps> = (props) => {
-  const [newTask, setNewTask] = useState<PartialTask>({ title: '' })
+  const [newTask, setNewTask] = useState<Task>(makeNewTask())
+  const newTaskTitleElement = useRef<HTMLInputElement | null>(null)
 
   const handleChange = (
     e:
@@ -27,7 +37,18 @@ const NewTask: FC<NewTaskProps> = (props) => {
     e.preventDefault()
 
     props.onNewTask(newTask)
-    setNewTask({ title: '' })
+    setNewTask(makeNewTask())
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    switch (e.key.toLowerCase()) {
+      default:
+        return
+      case 'escape':
+        e.preventDefault()
+        setNewTask(makeNewTask())
+        newTaskTitleElement.current && newTaskTitleElement.current.focus()
+    }
   }
 
   return (
@@ -36,33 +57,33 @@ const NewTask: FC<NewTaskProps> = (props) => {
         type='text'
         name='title'
         placeholder='What do?'
+        onKeyDown={handleKeyPress}
         onChange={handleChange}
         value={newTask.title}
+        ref={newTaskTitleElement}
       />
-      {!newTask.title.length ? null : (
-        <>
-          {' '}
-          <textarea
-            name='description'
-            placeholder='Where/why/how do?'
-            onChange={handleChange}
-            value={newTask.description}></textarea>
-          <input
-            type='date'
-            name='dueDate'
-            onChange={handleChange}
-            value={newTask.dueDate}
-          />
-          <input
-            type='text'
-            name='project'
-            placeholder='Who do?'
-            onChange={handleChange}
-            value={newTask.assignedTo}
-          />
-          <input type='submit' value='Add task' />
-        </>
-      )}
+      <div className={`more ${newTask.title.length ? 'show' : ''}`}>
+        <textarea
+          name='description'
+          placeholder='Where/why/how do?'
+          onKeyDown={handleKeyPress}
+          onChange={handleChange}
+          value={newTask.description}></textarea>
+        <input
+          type='date'
+          name='dueDate'
+          onChange={handleChange}
+          value={newTask.dueDate}
+        />
+        <input
+          type='text'
+          name='project'
+          placeholder='Who do?'
+          onChange={handleChange}
+          value={newTask.assignedTo}
+        />
+        <input type='submit' value='Add task' />
+      </div>
     </form>
   )
 }
