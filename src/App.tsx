@@ -2,13 +2,67 @@
 import './App.scss'
 
 import { nanoid } from 'nanoid'
-import { useEffect, useReducer, useState } from 'react'
-import { FiDelete, FiMenu, FiPause, FiPlay, FiPlus, FiTrash2, FiWatch, FiX } from 'react-icons/fi'
+import { useEffect, useReducer, useRef, useState } from 'react'
+import {
+  FiDelete,
+  FiMenu,
+  FiPause,
+  FiPlay,
+  FiPlus,
+  FiPlusCircle,
+  FiTrash2,
+  FiWatch,
+  FiX,
+} from 'react-icons/fi'
 
 export type Project = {
   id: string
   title: string
   description: string
+}
+
+export type ProjectKeys = keyof Exclude<Project, 'id'>
+
+const adjectives = [
+  'Funky',
+  'Dopey',
+  'Retarded',
+  'Sleepy',
+  'Crazy',
+  'Chubby',
+  'Skinny',
+  'Hefty',
+  'Corny',
+  'Tony the',
+  'That One',
+  'Big Booty',
+]
+const animals = [
+  'Dog',
+  'Cat',
+  'Giraffe',
+  'Shark',
+  'T-Rex',
+  'Otter',
+  'Lion',
+  'Tiger',
+  'Bonobo',
+  'Space Monkey',
+  'Human',
+  'Rabbit',
+  'Squirrel',
+  'Elephant',
+  'Gorilla',
+  'Wolf',
+  'Cougar',
+]
+
+function getRandomName(): string {
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)]
+  const animal = animals[Math.floor(Math.random() * animals.length)]
+  const name = adjective + ' ' + animal
+
+  return name === 'Retarded Dog' ? getRandomName() : name
 }
 
 function useTodoProjects() {
@@ -38,17 +92,120 @@ function useTodoProjects() {
   return { addNewProject, projects }
 }
 
+export type ProjectCardProps = {
+  project: Project | null
+  onChange: (project: Project) => void
+}
+
+export const ProjectCard: React.FC<ProjectCardProps> = ({
+  project,
+  onChange,
+}) => {
+  const inputEl = useRef<HTMLInputElement>(null)
+  const [title, setTitle] = useState(project?.title)
+
+  function handleChangeTitle(title: string) {
+    setTitle(title)
+  }
+
+  function handleOnChange() {
+    if (title?.length && project) {
+      return onChange({ ...project, title })
+    }
+
+    return setTitle(project?.title)
+  }
+
+  useEffect(() => setTitle(project?.title), [project])
+
+  return project === null ? null : (
+    <div className='project-card'>
+      <div className='header'>
+        <input
+          ref={inputEl}
+          type='text'
+          className='project-title'
+          value={title}
+          onFocus={() => inputEl.current && inputEl.current.select()}
+          onBlur={handleOnChange}
+          onKeyDown={(e) =>
+            e.key === 'Escape' && inputEl.current && inputEl.current.blur()
+          }
+          onInput={(e) => {
+            console.log(e.currentTarget.value)
+
+            return handleChangeTitle(e.currentTarget.value)
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 const App = () => {
-  const { projects, addNewProject } = useTodoProjects()
+  // const { projects, addNewProject } = useTodoProjects()
+
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+
+  function addNewProject() {
+    const newProject: Project = {
+      id: nanoid(),
+      title: getRandomName(),
+      description: '',
+    }
+
+    setProjects([...projects, newProject])
+    setSelectedProject(newProject)
+  }
+
+  function updateSelectedProject(project: Project) {
+    setSelectedProject(project)
+    setProjects(
+      projects.map((proj) => (proj.id === project.id ? project : proj))
+    )
+  }
+
+  function selectProject(id: string) {
+    const project = projects.find((proj) => proj.id === id)
+    console.log(project)
+
+    if (project) {
+      setSelectedProject(project)
+    }
+  }
 
   return (
     <>
       <header>
         <nav>
           <h1>Project Tracker</h1>
+          <div className='project-controls'>
+            {projects.length ? (
+              <select
+                value={selectedProject?.id}
+                onChange={(e) => selectProject(e.target.value)}
+              >
+                {/* <option value={'boop'}>Boop</option> */}
+                {projects.map((proj) => (
+                  <option key={proj.id} value={proj.id}>
+                    {proj.title}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <button onClick={addNewProject}>New Project</button>
+          </div>
         </nav>
       </header>
+      {/* <code>
+        <pre>{JSON.stringify(projects)}</pre>
+      </code> */}
       <main>
+        <ProjectCard
+          project={selectedProject}
+          onChange={updateSelectedProject}
+        />
         <section className='project-card'>
           <div className='header'>
             <div>
@@ -105,7 +262,8 @@ const App = () => {
                 </span>
                 <span
                   className='button'
-                  title='Add task and start time tracking'>
+                  title='Add task and start time tracking'
+                >
                   <FiPlay />
                 </span>
               </nav>

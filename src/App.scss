@@ -70,12 +70,55 @@ body * {
 header {
   background-color: var(--brand-color);
   color: var(--light-color);
-  padding: 1.65rem 1rem;
+  // color: var(--light-color);
+  // padding: 1.65rem 1rem;
 
-  h1 {
-    margin: 0;
-    font-size: 2rem;
-    text-align: center;
+  nav {
+    // background-color: darkslategray;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.65rem 1rem;
+
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      text-align: center;
+    }
+
+    .project-controls {
+      display: flex;
+      gap: 2rem;
+      justify-content: space-around;
+      width: max(320px, 80%);
+      padding: 0;
+      margin: 0;
+
+      select,
+      button {
+        background-color: white;
+        color: black;
+        border: 0;
+        border-radius: 0.5em;
+        padding: 0.5em;
+      }
+
+      select {
+        flex-grow: 1;
+      }
+
+      button:hover {
+        background-color: #ddd;
+      }
+
+      button:active {
+        background-color: var(--pop-color);
+        color: var(--light-color);
+      }
+    }
   }
 }
 
@@ -95,6 +138,7 @@ header {
       // color: var(--fg-color);
       border: 0;
       font-size: 1.5em;
+      width: 100%;
     }
 
     h2 {
