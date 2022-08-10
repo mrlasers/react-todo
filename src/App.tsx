@@ -24,6 +24,8 @@ import {
   FiX,
 } from 'react-icons/fi'
 
+import { getRandomName } from './helpers'
+
 export type Project = {
   id: string
   title: string
@@ -37,51 +39,6 @@ export type ProjectKeys = keyof Exclude<Project, 'id'>
 export type Todo = {
   id: string
   title: string
-}
-
-const adjectives = [
-  'Big Booty',
-  'Chubby',
-  'Chunky',
-  'Corny',
-  'Crazy',
-  'Dopey',
-  'Fast',
-  'Funky',
-  'Hefty',
-  'Skinny',
-  'Sleepy',
-  'That One',
-  'Tony the',
-]
-const animals = [
-  'Bonobo',
-  'Cat',
-  'Cheetah',
-  'Cougar',
-  'Dog',
-  'Elephant',
-  'Giraffe',
-  'Gorilla',
-  'Human',
-  'Lion',
-  'Orca',
-  'Otter',
-  'Rabbit',
-  'Shark',
-  'Space Monkey',
-  'Squirrel',
-  'T-Rex',
-  'Tiger',
-  'Wolf',
-]
-
-function getRandomName(): string {
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)]
-  const animal = animals[Math.floor(Math.random() * animals.length)]
-  const name = adjective + ' ' + animal
-
-  return name
 }
 
 //-- components
