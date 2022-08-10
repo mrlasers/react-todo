@@ -4,6 +4,7 @@ import './App.scss'
 import { nanoid } from 'nanoid'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import {
+  FiClock,
   FiDelete,
   FiMenu,
   FiPause,
@@ -19,9 +20,15 @@ export type Project = {
   id: string
   title: string
   description: string
+  todos: Todo[]
 }
 
 export type ProjectKeys = keyof Exclude<Project, 'id'>
+
+export type Todo = {
+  id: string
+  title: string
+}
 
 const adjectives = [
   'Funky',
@@ -74,6 +81,7 @@ function useTodoProjects() {
         id: nanoid(),
         title: 'Untitled Project 1',
         description: '',
+        todos: [],
       },
     ])
   }, [])
@@ -85,6 +93,7 @@ function useTodoProjects() {
         id: nanoid(),
         title: 'Untitled Project ' + (projects.length + 1),
         description: '',
+        todos: [],
       },
     ])
   }
@@ -93,7 +102,7 @@ function useTodoProjects() {
 }
 
 export type ProjectCardProps = {
-  project: Project | null
+  project: Project
   onChange: (project: Project) => void
 }
 
@@ -102,31 +111,50 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onChange,
 }) => {
   const inputEl = useRef<HTMLInputElement>(null)
-  const [title, setTitle] = useState(project?.title)
+  const textareaEl = useRef<HTMLTextAreaElement>(null)
+  const [isCtrlsActive, setIsCtrlsActive] = useState(false)
+  const [title, setTitle] = useState(project.title)
+  const [description, setDescription] = useState(project.description)
 
-  function handleChangeTitle(title: string) {
-    setTitle(title)
+  function handleChangeTitle(newTitle: string) {
+    setTitle(newTitle)
+  }
+  function handleChangeDescription(newDescription: string) {
+    setDescription(newDescription)
   }
 
   function handleOnChange() {
-    if (title?.length && project) {
-      return onChange({ ...project, title })
+    setIsCtrlsActive(false)
+    if (!title) {
+      return setTitle(project.title)
     }
 
-    return setTitle(project?.title)
+    const newProject = {
+      ...project,
+      title: title ?? project.title,
+      description: description ?? project.title,
+    }
+
+    onChange(newProject)
   }
 
-  useEffect(() => setTitle(project?.title), [project])
+  useEffect(() => {
+    setTitle(project.title)
+    setDescription(project.description)
+  }, [project])
 
   return project === null ? null : (
     <div className='project-card'>
-      <div className='header'>
+      <div className={'header' + (isCtrlsActive ? ' active' : '')}>
         <input
           ref={inputEl}
           type='text'
           className='project-title'
           value={title}
-          onFocus={() => inputEl.current && inputEl.current.select()}
+          onFocus={() => {
+            setIsCtrlsActive(true)
+            inputEl.current && inputEl.current.select()
+          }}
           onBlur={handleOnChange}
           onKeyDown={(e) =>
             e.key === 'Escape' && inputEl.current && inputEl.current.blur()
@@ -137,6 +165,29 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             return handleChangeTitle(e.currentTarget.value)
           }}
         />
+        <nav>
+          <button title='Add due date'>
+            <FiClock />
+          </button>
+          <button title='Delete?'>
+            <FiTrash2 />
+          </button>
+        </nav>
+      </div>
+      <div className='description'>
+        <textarea
+          ref={textareaEl}
+          spellCheck={false}
+          placeholder='Enter description, notes, etc., here...'
+          value={description}
+          onBlur={handleOnChange}
+          onKeyDown={(e) =>
+            e.key === 'Escape' &&
+            textareaEl.current &&
+            textareaEl.current.blur()
+          }
+          onInput={(e) => handleChangeDescription(e.currentTarget.value)}
+        ></textarea>
       </div>
     </div>
   )
@@ -153,22 +204,26 @@ const App = () => {
       id: nanoid(),
       title: getRandomName(),
       description: '',
+      todos: [],
     }
 
-    setProjects([...projects, newProject])
+    setProjects(
+      [...projects, newProject].sort((a, b) => (a.title > b.title ? 1 : -1))
+    )
     setSelectedProject(newProject)
   }
 
   function updateSelectedProject(project: Project) {
     setSelectedProject(project)
     setProjects(
-      projects.map((proj) => (proj.id === project.id ? project : proj))
+      projects
+        .map((proj) => (proj.id === project.id ? project : proj))
+        .sort((a, b) => (a.title > b.title ? 1 : -1))
     )
   }
 
   function selectProject(id: string) {
     const project = projects.find((proj) => proj.id === id)
-    console.log(project)
 
     if (project) {
       setSelectedProject(project)
@@ -202,10 +257,13 @@ const App = () => {
         <pre>{JSON.stringify(projects)}</pre>
       </code> */}
       <main>
-        <ProjectCard
-          project={selectedProject}
-          onChange={updateSelectedProject}
-        />
+        {selectedProject && (
+          <ProjectCard
+            project={selectedProject}
+            onChange={updateSelectedProject}
+          />
+        )}
+        <hr />
         <section className='project-card'>
           <div className='header'>
             <div>

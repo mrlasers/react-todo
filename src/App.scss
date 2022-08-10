@@ -131,6 +131,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
     // padding: 0.25rem 1rem;
 
     .project-title {
@@ -139,12 +140,45 @@ header {
       border: 0;
       font-size: 1.5em;
       width: 100%;
+      border-radius: 0.25em;
+      padding: 0.25rem;
     }
 
     h2 {
       text-align: left;
     }
+
+    nav {
+      display: flex;
+      flex-direction: row;
+    }
+
+    button {
+      // display: none;
+      display: flex;
+      padding: 0.5em;
+      // border: 0;
+      // opacity: 0;
+      height: 100%;
+      // aspect-ratio: 1 / 1;
+      cursor: pointer;
+
+      transition: opacity 250ms;
+
+      & > * {
+        height: 100%;
+      }
+    }
   }
+
+  // &:hover,
+  // &.active {
+  //   button {
+  //     // display: initial;
+  //     opacity: 1;
+  //     transition: opacity 150ms;
+  //   }
+  // }
 
   .description {
     text-align: left;
@@ -158,6 +192,7 @@ header {
       border: 0;
 
       line-height: 170%;
+      padding: 0.25rem;
     }
   }
 }
