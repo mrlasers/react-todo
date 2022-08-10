@@ -177,14 +177,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         description: description ?? project.description,
       },
     })
-
-    // const newProject = {
-    //   ...project,
-    //   title: title ?? project.title,
-    //   description: description ?? project.title,
-    // }
-
-    // onChange(newProject)
   }
 
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -395,10 +387,6 @@ const App = () => {
   )
 
   const { projects, selectedProject } = state
-
-  // useEffect(() => {
-  //   console.log('rerendering app')
-  // }, [state])
 
   return (
     <>
