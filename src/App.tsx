@@ -4,24 +4,10 @@ import './App.scss'
 import { differenceInDays, format } from 'date-fns'
 import { nanoid } from 'nanoid'
 import {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
+    ButtonHTMLAttributes, InputHTMLAttributes, useEffect, useReducer, useRef, useState
 } from 'react'
 import {
-  FiClock,
-  FiDelete,
-  FiMenu,
-  FiPause,
-  FiPlay,
-  FiPlus,
-  FiPlusCircle,
-  FiTrash2,
-  FiWatch,
-  FiX,
+    FiClock, FiDelete, FiMenu, FiPause, FiPlay, FiPlus, FiPlusCircle, FiTrash2, FiWatch, FiX
 } from 'react-icons/fi'
 
 import { getRandomName } from './helpers'
@@ -31,7 +17,6 @@ export type Project = {
   title: string
   description: string
   dueDate: string | null
-  todos: Todo[]
 }
 
 export type ProjectKeys = keyof Exclude<Project, 'id'>
@@ -39,12 +24,35 @@ export type ProjectKeys = keyof Exclude<Project, 'id'>
 export type Todo = {
   id: string
   title: string
+  projectId: string
 }
 
 //-- components
 
 export type CustomOnChange<T> = {
   onChange?: (value: T) => void
+}
+
+export type WithDispatch = {
+  dispatch: React.Dispatch<Action>
+}
+
+export const TodoCard: React.FC<CustomOnChange<Todo> & { todo: Todo }> = ({
+  onChange,
+  todo,
+}) => {
+  return (
+    <div className='todo-card'>
+      <TextInput
+        type='text'
+        value={todo.title}
+        onChange={(title) => onChange && onChange({ ...todo, title })}
+      />
+      <button>
+        <FiPlay />
+      </button>
+    </div>
+  )
 }
 
 export const DueDatePicker: React.FC<
@@ -63,8 +71,7 @@ export const DueDatePicker: React.FC<
       className={
         !daysLeft ? '' : daysLeft <= 1 ? 'warn' : daysLeft <= 7 ? 'chill' : ''
       }
-      style={{ position: 'relative' }}
-    >
+      style={{ position: 'relative' }}>
       <input
         required
         value={value ?? ''}
@@ -123,7 +130,7 @@ export const TextInput: React.FC<
       // ref={ref}
       onFocus={(e) => e.target.select()}
       onKeyDown={(e) =>
-        (e.key === 'Escape' || e.key === 'Enter') && e.target.blur()
+        (e.key === 'Escape' || e.key === 'Enter') && e.currentTarget.blur()
       }
       onInput={(e) => setText(e.currentTarget.value)}
       onBlur={(e) => props.onChange && props.onChange(text)}
@@ -134,11 +141,13 @@ export const TextInput: React.FC<
 
 export type ProjectCardProps = {
   project: Project
+  todos: Todo[]
   dispatch: React.Dispatch<Action>
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({
   project,
+  todos,
   dispatch,
 }) => {
   const inputEl = useRef<HTMLInputElement>(null)
@@ -147,9 +156,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const [title, setTitle] = useState(project.title)
   const [description, setDescription] = useState(project.description)
 
-  function handleChangeTitle(newTitle: string) {
-    setTitle(newTitle)
-  }
+  // function handleChangeTitle(newTitle: string) {
+  //   setTitle(newTitle)
+  // }
   function handleChangeDescription(newDescription: string) {
     setDescription(newDescription)
   }
@@ -211,8 +220,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                   dueDate: date,
                 },
               })
-            }
-          >
+            }>
             <FiClock />
           </DueDatePicker>
           <button
@@ -220,8 +228,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             onClick={() => {
               console.log('deleting', project.id)
               dispatch({ type: 'DELETE_PROJECT', payload: project })
-            }}
-          >
+            }}>
             <FiTrash2 />
           </button>
         </nav>
@@ -238,13 +245,28 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             textareaEl.current &&
             textareaEl.current.blur()
           }
-          onInput={(e) => handleChangeDescription(e.currentTarget.value)}
-        ></textarea>
+          onInput={(e) =>
+            handleChangeDescription(e.currentTarget.value)
+          }></textarea>
       </div>
       <div className='todos-list'>
         <h3>Todos</h3>
-        {project.todos.map((todo) => (
-          <div>{todo.title}</div>
+        <nav>
+          <button
+            onClick={() => dispatch({ type: 'ADD_TODO', payload: project })}>
+            Add Task
+          </button>
+        </nav>
+        {todos.map((todo) => (
+          <TodoCard
+            todo={todo}
+            onChange={(newTodo) =>
+              dispatch({
+                type: 'UPDATE_TODO',
+                payload: newTodo,
+              })
+            }
+          />
         ))}
       </div>
     </div>
@@ -269,6 +291,7 @@ export const getDateValue = (date?: Date) => {
 
 export type State = {
   projects: Project[]
+  todos: Todo[]
   selectedProject: Project | null
 }
 
@@ -277,6 +300,8 @@ export type Action =
   | { type: 'DELETE_PROJECT'; payload: Project }
   | { type: 'ADD_NEW_PROJECT' }
   | { type: 'SELECT_PROJECT'; payload: Project | string }
+  | { type: 'ADD_TODO'; payload: Project }
+  | { type: 'UPDATE_TODO'; payload: Todo }
 
 export function stateReducer(state: State, action: Action): State {
   switch (action.type) {
@@ -315,7 +340,6 @@ export function stateReducer(state: State, action: Action): State {
         title: getRandomName(),
         description: '',
         dueDate: null,
-        todos: [],
       }
 
       return {
@@ -338,13 +362,36 @@ export function stateReducer(state: State, action: Action): State {
             selectedProject,
           }
     }
+    case 'ADD_TODO': {
+      const { payload: project } = action
+
+      return {
+        ...state,
+        todos: [
+          ...state.todos,
+          {
+            id: nanoid(),
+            title: getRandomName(),
+            projectId: project.id,
+          },
+        ],
+      }
+    }
+    case 'UPDATE_TODO': {
+      const { payload: todo } = action
+
+      return {
+        ...state,
+        todos: state.todos.map((td) => (td.id === todo.id ? todo : td)),
+      }
+    }
   }
 }
 
 const App = () => {
   const [state, dispatch] = useReducer<(state: State, action: Action) => State>(
     stateReducer,
-    { projects: [], selectedProject: null }
+    { projects: [], todos: [], selectedProject: null }
   )
 
   const { projects, selectedProject } = state
@@ -364,8 +411,7 @@ const App = () => {
                 value={selectedProject?.id}
                 onChange={(e) =>
                   dispatch({ type: 'SELECT_PROJECT', payload: e.target.value })
-                }
-              >
+                }>
                 {projects.map((proj) => (
                   <option key={proj.id} value={proj.id}>
                     {proj.title}
@@ -379,13 +425,20 @@ const App = () => {
           </div>
         </nav>
       </header>
-      {/* <code>
-        <pre>{JSON.stringify(state, null, 2)}</pre>
-      </code> */}
       <main>
         {selectedProject && (
-          <ProjectCard project={selectedProject} dispatch={dispatch} />
+          <ProjectCard
+            project={selectedProject}
+            todos={state.todos.filter(
+              (td) => td.projectId === selectedProject.id
+            )}
+            dispatch={dispatch}
+          />
         )}
+
+        <code>
+          <pre>{JSON.stringify(state.todos, null, 2)}</pre>
+        </code>
 
         {/* <hr />
         <section className='project-card'>
