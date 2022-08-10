@@ -4,13 +4,30 @@ import './App.scss'
 import { differenceInDays, format } from 'date-fns'
 import { nanoid } from 'nanoid'
 import {
-    ButtonHTMLAttributes, InputHTMLAttributes, useEffect, useReducer, useRef, useState
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
 } from 'react'
 import {
-    FiClock, FiDelete, FiMenu, FiPause, FiPlay, FiPlus, FiPlusCircle, FiTrash2, FiWatch, FiX
+  FiClock,
+  FiDelete,
+  FiMenu,
+  FiPause,
+  FiPlay,
+  FiPlus,
+  FiPlusCircle,
+  FiTrash2,
+  FiWatch,
+  FiX,
 } from 'react-icons/fi'
+import Modal from 'react-modal'
 
 import { getRandomName } from './helpers'
+
+Modal.setAppElement('#root')
 
 export type Project = {
   id: string
@@ -71,7 +88,8 @@ export const DueDatePicker: React.FC<
       className={
         !daysLeft ? '' : daysLeft <= 1 ? 'warn' : daysLeft <= 7 ? 'chill' : ''
       }
-      style={{ position: 'relative' }}>
+      style={{ position: 'relative' }}
+    >
       <input
         required
         value={value ?? ''}
@@ -212,15 +230,23 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                   dueDate: date,
                 },
               })
-            }>
+            }
+          >
             <FiClock />
           </DueDatePicker>
           <button
             title='Delete?'
             onClick={() => {
               console.log('deleting', project.id)
-              dispatch({ type: 'DELETE_PROJECT', payload: project })
-            }}>
+              dispatch({
+                type: 'DELETE',
+                payload: {
+                  type: 'DELETE_PROJECT',
+                  payload: project,
+                },
+              })
+            }}
+          >
             <FiTrash2 />
           </button>
         </nav>
@@ -237,15 +263,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             textareaEl.current &&
             textareaEl.current.blur()
           }
-          onInput={(e) =>
-            handleChangeDescription(e.currentTarget.value)
-          }></textarea>
+          onInput={(e) => handleChangeDescription(e.currentTarget.value)}
+        ></textarea>
       </div>
       <div className='todos-list'>
         <h3>Todos</h3>
         <nav>
           <button
-            onClick={() => dispatch({ type: 'ADD_TODO', payload: project })}>
+            onClick={() => dispatch({ type: 'ADD_TODO', payload: project })}
+          >
             Add Task
           </button>
         </nav>
@@ -285,17 +311,25 @@ export type State = {
   projects: Project[]
   todos: Todo[]
   selectedProject: Project | null
+  deleteOp?: DeleteAction
 }
+
+export type DeleteAction =
+  | { type: 'DELETE_PROJECT'; payload: Project }
+  | { type: 'DELETE_TODO'; payload: Todo }
 
 export type Action =
   | { type: 'UPDATE_PROJECT'; payload: Project }
   | { type: 'DELETE_PROJECT'; payload: Project }
+  | { type: 'DELETE'; payload?: DeleteAction }
   | { type: 'ADD_NEW_PROJECT' }
   | { type: 'SELECT_PROJECT'; payload: Project | string }
   | { type: 'ADD_TODO'; payload: Project }
   | { type: 'UPDATE_TODO'; payload: Todo }
+  | { type: 'DELETE_TODO'; payload: Todo }
 
 export function stateReducer(state: State, action: Action): State {
+  console.log('stateReducer:', action)
   switch (action.type) {
     default:
       return state
@@ -317,6 +351,7 @@ export function stateReducer(state: State, action: Action): State {
       }
     }
     case 'DELETE_PROJECT': {
+      console.log('DELETE_PROJECT', action.payload)
       const projects = state.projects.filter(
         (proj) => proj.id !== action.payload.id
       )
@@ -324,6 +359,7 @@ export function stateReducer(state: State, action: Action): State {
         ...state,
         projects,
         selectedProject: projects[0] ?? null,
+        deleteOp: undefined,
       }
     }
     case 'ADD_NEW_PROJECT': {
@@ -377,10 +413,54 @@ export function stateReducer(state: State, action: Action): State {
         todos: state.todos.map((td) => (td.id === todo.id ? todo : td)),
       }
     }
+    case 'DELETE': {
+      const deleteAction = action.payload
+      return {
+        ...state,
+        deleteOp: deleteAction,
+      }
+    }
   }
 }
 
+const DeleteModal: React.FC<{
+  dispatch: React.Dispatch<Action>
+  deleteAction?: DeleteAction
+}> = ({ dispatch, deleteAction }) => {
+  return (
+    <Modal
+      isOpen={!!deleteAction}
+      shouldCloseOnEsc={true}
+      shouldCloseOnOverlayClick={true}
+      onRequestClose={() => dispatch({ type: 'DELETE' })}
+      className='Modal'
+      overlayClassName='Overlay'
+    >
+      <h2>
+        Delete {deleteAction?.type === 'DELETE_PROJECT' ? 'Project' : 'Todo???'}{' '}
+        <em>{deleteAction?.payload.title}</em>
+      </h2>
+      <div className='buttons'>
+        <button
+          className='soft-button'
+          onClick={() => dispatch({ type: 'DELETE' })}
+        >
+          Cancel
+        </button>
+        <button
+          className='soft-button'
+          onClick={() => deleteAction && dispatch(deleteAction)}
+        >
+          Confirm
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 const App = () => {
+  const deleteDialogRef = useRef<React.LegacyRef<HTMLDialogElement>>(null)
+
   const [state, dispatch] = useReducer<(state: State, action: Action) => State>(
     stateReducer,
     { projects: [], todos: [], selectedProject: null }
@@ -388,8 +468,15 @@ const App = () => {
 
   const { projects, selectedProject } = state
 
+  // useEffect(() => {
+  //   if (state.deleteOp) {
+  //     deleteDialogRef.current?.showModal()
+  //   }
+  // }, [state.deleteOp])
+
   return (
     <>
+      <DeleteModal dispatch={dispatch} deleteAction={state.deleteOp} />
       <header>
         <nav>
           <h1>Project Tracker</h1>
@@ -399,7 +486,8 @@ const App = () => {
                 value={selectedProject?.id}
                 onChange={(e) =>
                   dispatch({ type: 'SELECT_PROJECT', payload: e.target.value })
-                }>
+                }
+              >
                 {projects.map((proj) => (
                   <option key={proj.id} value={proj.id}>
                     {proj.title}

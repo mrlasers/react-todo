@@ -371,3 +371,57 @@ header {
     border-radius: 0.5em;
   }
 }
+
+.Modal {
+  max-width: clamp(100vw, 50%, 40ch);
+  background-color: var(--bg-color);
+  padding: 1rem;
+  border-radius: 0.35em;
+  box-shadow: 3px 3px 5px rgba(0 0 0 / 0.25);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+
+  h2 {
+    margin: 0;
+    font-size: 1.3em;
+  }
+
+  .buttons {
+    margin-inline: auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+.soft-button {
+  border: 0;
+  background-color: lightgrey;
+  padding: 0.5em;
+  border-radius: 0.5em;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--pop-color);
+    color: var(--bg-color);
+  }
+
+  &:active {
+    background-color: var(--brand-color);
+    color: var(--bg-color);
+  }
+}
+
+.Overlay {
+  display: grid;
+  place-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0 0 0 / 0.5);
+}
