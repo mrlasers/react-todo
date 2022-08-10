@@ -43,6 +43,7 @@ const adjectives = [
   'Tony the',
   'That One',
   'Big Booty',
+  'Fast',
 ]
 const animals = [
   'Dog',
@@ -62,6 +63,7 @@ const animals = [
   'Gorilla',
   'Wolf',
   'Cougar',
+  'Cheetah',
 ]
 
 function getRandomName(): string {
@@ -193,42 +195,77 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   )
 }
 
+//-- little helper functions
+
+export const sortByTitle = (a: Project, b: Project) =>
+  a.title > b.title ? 1 : -1
+
+//-- state reducer and stuff
+
+export type State = {
+  projects: Project[]
+  selectedProject: Project | null
+}
+
+export type Action =
+  | { type: 'UPDATE_PROJECT'; payload: Project }
+  | { type: 'DELETE_PROJECT'; payload: Project }
+  | { type: 'ADD_NEW_PROJECT' }
+  | { type: 'SELECT_PROJECT'; payload: Project | string }
+
+export function stateReducer(state: State, action: Action): State {
+  switch (action.type) {
+    default:
+      return state
+    case 'UPDATE_PROJECT': {
+      const { projects } = state
+      const { payload: project } = action
+
+      return {
+        ...state,
+        projects: projects.map((thisProject) =>
+          thisProject.id === project.id ? project : thisProject
+        ),
+      }
+    }
+    case 'ADD_NEW_PROJECT': {
+      const newProject: Project = {
+        id: nanoid(),
+        title: getRandomName(),
+        description: '',
+        todos: [],
+      }
+
+      return {
+        ...state,
+        projects: [...state.projects, newProject].sort(sortByTitle),
+        selectedProject: newProject,
+      }
+    }
+    case 'SELECT_PROJECT': {
+      const { payload } = action
+      const id = typeof payload === 'string' ? payload : payload.id
+      const selectedProject = state.projects.find(
+        (project) => project.id === id
+      )
+
+      return !selectedProject
+        ? state
+        : {
+            ...state,
+            selectedProject,
+          }
+    }
+  }
+}
+
 const App = () => {
-  // const { projects, addNewProject } = useTodoProjects()
+  const [state, dispatch] = useReducer<(state: State, action: Action) => State>(
+    stateReducer,
+    { projects: [], selectedProject: null }
+  )
 
-  const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-
-  function addNewProject() {
-    const newProject: Project = {
-      id: nanoid(),
-      title: getRandomName(),
-      description: '',
-      todos: [],
-    }
-
-    setProjects(
-      [...projects, newProject].sort((a, b) => (a.title > b.title ? 1 : -1))
-    )
-    setSelectedProject(newProject)
-  }
-
-  function updateSelectedProject(project: Project) {
-    setSelectedProject(project)
-    setProjects(
-      projects
-        .map((proj) => (proj.id === project.id ? project : proj))
-        .sort((a, b) => (a.title > b.title ? 1 : -1))
-    )
-  }
-
-  function selectProject(id: string) {
-    const project = projects.find((proj) => proj.id === id)
-
-    if (project) {
-      setSelectedProject(project)
-    }
-  }
+  const { projects, selectedProject } = state
 
   return (
     <>
@@ -239,9 +276,10 @@ const App = () => {
             {projects.length ? (
               <select
                 value={selectedProject?.id}
-                onChange={(e) => selectProject(e.target.value)}
+                onChange={(e) =>
+                  dispatch({ type: 'SELECT_PROJECT', payload: e.target.value })
+                }
               >
-                {/* <option value={'boop'}>Boop</option> */}
                 {projects.map((proj) => (
                   <option key={proj.id} value={proj.id}>
                     {proj.title}
@@ -249,21 +287,22 @@ const App = () => {
                 ))}
               </select>
             ) : null}
-            <button onClick={addNewProject}>New Project</button>
+            <button onClick={() => dispatch({ type: 'ADD_NEW_PROJECT' })}>
+              New Project
+            </button>
           </div>
         </nav>
       </header>
-      {/* <code>
-        <pre>{JSON.stringify(projects)}</pre>
-      </code> */}
       <main>
-        {selectedProject && (
+        {!!selectedProject && (
           <ProjectCard
             project={selectedProject}
-            onChange={updateSelectedProject}
+            onChange={(project) =>
+              dispatch({ type: 'UPDATE_PROJECT', payload: project })
+            }
           />
         )}
-        <hr />
+        {/* <hr />
         <section className='project-card'>
           <div className='header'>
             <div>
@@ -291,7 +330,6 @@ const App = () => {
         <section className='task-list'>
           <ul>
             <li className='active'>
-              {/* <h3 className='title'>Work on todo app</h3> */}
               <input
                 className='title'
                 type='text'
@@ -307,9 +345,6 @@ const App = () => {
                 <span className='button'>
                   <FiPause />
                 </span>
-                {/* <span className='button'>
-                  <FiPlay />
-                </span> */}
               </nav>
             </li>
             <li className='new-task'>
@@ -332,7 +367,6 @@ const App = () => {
                 type='text'
                 defaultValue='Reply to emails'
               />
-              {/* <h3 className='title'>Reply to emails</h3> */}
               <div className='time'>
                 0 <FiWatch /> -:--:--
               </div>
@@ -346,7 +380,7 @@ const App = () => {
               </nav>
             </li>
           </ul>
-        </section>
+        </section> */}
       </main>
     </>
   )
