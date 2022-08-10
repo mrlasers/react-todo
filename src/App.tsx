@@ -1,8 +1,16 @@
 // import reactLogo from './assets/react.svg'
 import './App.scss'
 
+import { differenceInDays, format } from 'date-fns'
 import { nanoid } from 'nanoid'
-import { useEffect, useReducer, useRef, useState } from 'react'
+import {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import {
   FiClock,
   FiDelete,
@@ -20,6 +28,7 @@ export type Project = {
   id: string
   title: string
   description: string
+  dueDate: string | null
   todos: Todo[]
 }
 
@@ -31,39 +40,40 @@ export type Todo = {
 }
 
 const adjectives = [
-  'Funky',
-  'Dopey',
-  'Retarded',
-  'Sleepy',
-  'Crazy',
-  'Chubby',
-  'Skinny',
-  'Hefty',
-  'Corny',
-  'Tony the',
-  'That One',
   'Big Booty',
+  'Chubby',
+  'Chunky',
+  'Corny',
+  'Crazy',
+  'Dopey',
   'Fast',
+  'Funky',
+  'Hefty',
+  'Skinny',
+  'Sleepy',
+  'That One',
+  'Tony the',
 ]
 const animals = [
-  'Dog',
-  'Cat',
-  'Giraffe',
-  'Shark',
-  'T-Rex',
-  'Otter',
-  'Lion',
-  'Tiger',
   'Bonobo',
-  'Space Monkey',
-  'Human',
-  'Rabbit',
-  'Squirrel',
-  'Elephant',
-  'Gorilla',
-  'Wolf',
-  'Cougar',
+  'Cat',
   'Cheetah',
+  'Cougar',
+  'Dog',
+  'Elephant',
+  'Giraffe',
+  'Gorilla',
+  'Human',
+  'Lion',
+  'Orca',
+  'Otter',
+  'Rabbit',
+  'Shark',
+  'Space Monkey',
+  'Squirrel',
+  'T-Rex',
+  'Tiger',
+  'Wolf',
 ]
 
 function getRandomName(): string {
@@ -71,46 +81,108 @@ function getRandomName(): string {
   const animal = animals[Math.floor(Math.random() * animals.length)]
   const name = adjective + ' ' + animal
 
-  return name === 'Retarded Dog' ? getRandomName() : name
+  return name
 }
 
-function useTodoProjects() {
-  const [projects, setProjects] = useState<Project[]>([])
+//-- components
+
+export type CustomOnChange<T> = {
+  onChange?: (value: T) => void
+}
+
+export const DueDatePicker: React.FC<
+  Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange' | 'value'> &
+    CustomOnChange<string> & { value: string | null }
+> = (props) => {
+  const { children, onChange, value, ...attrs } = props
+
+  const daysLeft = !value
+    ? null
+    : differenceInDays(new Date(value), new Date(getDateValue()))
+
+  return (
+    <button
+      {...attrs}
+      className={
+        !daysLeft ? '' : daysLeft <= 1 ? 'warn' : daysLeft <= 7 ? 'chill' : ''
+      }
+      style={{ position: 'relative' }}
+    >
+      <input
+        required
+        value={value ?? ''}
+        type='date'
+        onChange={(e) => {
+          onChange && onChange(e.target.value)
+        }}
+        onClick={(e) => {
+          console.log('click')
+        }}
+        style={{
+          opacity: 0,
+          // border: 0,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 9999999,
+        }}
+      />
+      <FiClock /> <span>{value && format(new Date(value), 'MMM d')}</span>
+      {/* {children} */}
+    </button>
+  )
+}
+
+export type TextInputProps = {
+  onChange?: (text: string) => void
+}
+
+/**
+ * Text <input/> that selects text `onFocus` and calls `onChange` on blur
+ *
+ * blurs on `Escape` or `Enter` keys
+ */
+export const TextInput: React.FC<
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> & TextInputProps
+> = (props) => {
+  const [text, setText] = useState(
+    typeof props.value === 'string' ? props.value : ''
+  )
+
+  const { onChange, ...attrs } = props
 
   useEffect(() => {
-    setProjects([
-      {
-        id: nanoid(),
-        title: 'Untitled Project 1',
-        description: '',
-        todos: [],
-      },
-    ])
-  }, [])
+    setText(typeof props.value === 'string' ? props.value : text)
+  }, [props.value])
 
-  function addNewProject() {
-    setProjects([
-      ...projects,
-      {
-        id: nanoid(),
-        title: 'Untitled Project ' + (projects.length + 1),
-        description: '',
-        todos: [],
-      },
-    ])
-  }
-
-  return { addNewProject, projects }
+  return (
+    <input
+      {...attrs}
+      type='text'
+      // ref={ref}
+      onFocus={(e) => e.target.select()}
+      onKeyDown={(e) =>
+        (e.key === 'Escape' || e.key === 'Enter') && e.target.blur()
+      }
+      onInput={(e) => setText(e.currentTarget.value)}
+      onBlur={(e) => props.onChange && props.onChange(text)}
+      value={text}
+    />
+  )
 }
 
 export type ProjectCardProps = {
   project: Project
-  onChange: (project: Project) => void
+  dispatch: React.Dispatch<Action>
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({
   project,
-  onChange,
+  dispatch,
 }) => {
   const inputEl = useRef<HTMLInputElement>(null)
   const textareaEl = useRef<HTMLTextAreaElement>(null)
@@ -131,14 +203,25 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       return setTitle(project.title)
     }
 
-    const newProject = {
-      ...project,
-      title: title ?? project.title,
-      description: description ?? project.title,
-    }
+    dispatch({
+      type: 'UPDATE_PROJECT',
+      payload: {
+        ...project,
+        title: title ?? project.title,
+        description: description ?? project.description,
+      },
+    })
 
-    onChange(newProject)
+    // const newProject = {
+    //   ...project,
+    //   title: title ?? project.title,
+    //   description: description ?? project.title,
+    // }
+
+    // onChange(newProject)
   }
+
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   useEffect(() => {
     setTitle(project.title)
@@ -148,30 +231,40 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   return project === null ? null : (
     <div className='project-card'>
       <div className={'header' + (isCtrlsActive ? ' active' : '')}>
-        <input
-          ref={inputEl}
+        <TextInput
           type='text'
           className='project-title'
           value={title}
-          onFocus={() => {
-            setIsCtrlsActive(true)
-            inputEl.current && inputEl.current.select()
-          }}
           onBlur={handleOnChange}
-          onKeyDown={(e) =>
-            e.key === 'Escape' && inputEl.current && inputEl.current.blur()
-          }
-          onInput={(e) => {
-            console.log(e.currentTarget.value)
-
-            return handleChangeTitle(e.currentTarget.value)
+          onChange={(title) => {
+            return dispatch({
+              type: 'UPDATE_PROJECT',
+              payload: { ...project, title: title },
+            })
           }}
         />
         <nav>
-          <button title='Add due date'>
+          <DueDatePicker
+            value={project.dueDate}
+            onChange={(date) =>
+              dispatch({
+                type: 'UPDATE_PROJECT',
+                payload: {
+                  ...project,
+                  dueDate: date,
+                },
+              })
+            }
+          >
             <FiClock />
-          </button>
-          <button title='Delete?'>
+          </DueDatePicker>
+          <button
+            title='Delete?'
+            onClick={() => {
+              console.log('deleting', project.id)
+              dispatch({ type: 'DELETE_PROJECT', payload: project })
+            }}
+          >
             <FiTrash2 />
           </button>
         </nav>
@@ -191,6 +284,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           onInput={(e) => handleChangeDescription(e.currentTarget.value)}
         ></textarea>
       </div>
+      <div className='todos-list'>
+        <h3>Todos</h3>
+        {project.todos.map((todo) => (
+          <div>{todo.title}</div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -199,6 +298,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
 
 export const sortByTitle = (a: Project, b: Project) =>
   a.title > b.title ? 1 : -1
+
+export const getDateValue = (date?: Date) => {
+  const now = date ?? new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const day = now.getDate()
+
+  return `${year}-${month}-${day}`
+}
 
 //-- state reducer and stuff
 
@@ -221,11 +329,27 @@ export function stateReducer(state: State, action: Action): State {
       const { projects } = state
       const { payload: project } = action
 
+      const selectedProject =
+        state.selectedProject?.id === project.id
+          ? project
+          : state.selectedProject
+
       return {
         ...state,
         projects: projects.map((thisProject) =>
           thisProject.id === project.id ? project : thisProject
         ),
+        selectedProject: selectedProject,
+      }
+    }
+    case 'DELETE_PROJECT': {
+      const projects = state.projects.filter(
+        (proj) => proj.id !== action.payload.id
+      )
+      return {
+        ...state,
+        projects,
+        selectedProject: projects[0] ?? null,
       }
     }
     case 'ADD_NEW_PROJECT': {
@@ -233,6 +357,7 @@ export function stateReducer(state: State, action: Action): State {
         id: nanoid(),
         title: getRandomName(),
         description: '',
+        dueDate: null,
         todos: [],
       }
 
@@ -267,6 +392,10 @@ const App = () => {
 
   const { projects, selectedProject } = state
 
+  // useEffect(() => {
+  //   console.log('rerendering app')
+  // }, [state])
+
   return (
     <>
       <header>
@@ -293,15 +422,14 @@ const App = () => {
           </div>
         </nav>
       </header>
+      {/* <code>
+        <pre>{JSON.stringify(state, null, 2)}</pre>
+      </code> */}
       <main>
-        {!!selectedProject && (
-          <ProjectCard
-            project={selectedProject}
-            onChange={(project) =>
-              dispatch({ type: 'UPDATE_PROJECT', payload: project })
-            }
-          />
+        {selectedProject && (
+          <ProjectCard project={selectedProject} dispatch={dispatch} />
         )}
+
         {/* <hr />
         <section className='project-card'>
           <div className='header'>
