@@ -23,6 +23,7 @@ const adjectives = [
   'Quiet',
   'Rowdy',
   'Simple',
+  'Six-Four',
   'Skinny',
   'Sleepy',
   'Sleezy',

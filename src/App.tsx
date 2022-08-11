@@ -38,6 +38,15 @@ import {
 import Modal from 'react-modal'
 
 import { getRandomName } from './helpers'
+import {
+  newProject,
+  newTodo,
+  removeTodo,
+  replaceTodo,
+  startTodoTimer,
+  todoCancelTimer,
+  todoStopTimer,
+} from './helpers/update'
 
 Modal.setAppElement('#root')
 
@@ -121,30 +130,6 @@ export const TodoCard: React.FC<
       </div>
     </div>
   )
-}
-
-export function todoStopTimer(todo: Todo): Todo {
-  if (!todo.taskStartTime) {
-    return todo
-  }
-
-  const endTime = new Date()
-  const duration = differenceInMilliseconds(endTime, todo.taskStartTime)
-
-  return {
-    ...todo,
-    taskStartTime: undefined,
-    taskTime: [
-      ...todo.taskTime,
-      {
-        start: todo.taskStartTime,
-        end: endTime,
-        duration: duration,
-      },
-    ],
-    totalDuration: todo.totalDuration + duration,
-    lastWorked: endTime,
-  }
 }
 
 export const DueDatePicker: React.FC<
@@ -458,148 +443,80 @@ export function update(model: Model, msg: Msg): Model {
       }
     }
     case 'UPDATE_PROJECT': {
-      const { projects } = model
-      const { payload: project } = msg
-
-      const selectedProject =
-        model.selectedProject?.id === project.id
-          ? project
-          : model.selectedProject
-
       return {
         ...model,
-        projects: projects.map((thisProject) =>
-          thisProject.id === project.id ? project : thisProject
+        projects: model.projects.map((thisProject) =>
+          thisProject.id === msg.payload.id ? msg.payload : thisProject
         ),
-        selectedProject: selectedProject,
+        selectedProject:
+          model.selectedProject?.id === msg.payload.id
+            ? msg.payload
+            : model.selectedProject,
       }
     }
     case 'DELETE_PROJECT': {
-      console.log('DELETE_PROJECT', msg.payload)
-      const projects = model.projects.filter(
-        (proj) => proj.id !== msg.payload.id
+      return pipe(
+        model.projects.filter((proj) => proj.id !== msg.payload.id),
+        (projects) => ({
+          ...model,
+          projects,
+          selectedProject: projects[0] ?? null,
+          deleteOp: undefined,
+        })
       )
-      return {
-        ...model,
-        projects,
-        selectedProject: projects[0] ?? null,
-        deleteOp: undefined,
-      }
     }
     case 'ADD_NEW_PROJECT': {
-      const newProject: Project = {
-        id: nanoid(),
-        title: getRandomName(),
-        description: '',
-        dueDate: null,
-      }
-
-      return {
+      return pipe(newProject(), (project) => ({
         ...model,
-        projects: [...model.projects, newProject].sort(sortByTitle),
-        selectedProject: newProject,
-      }
+        projects: [...model.projects, project].sort(sortByTitle),
+        selectedProject: project,
+      }))
     }
     case 'SELECT_PROJECT': {
-      const { payload } = msg
-      const id = payload
-      const selectedProject = model.projects.find(
-        (project) => project.id === id
+      return pipe(
+        O.fromNullable(
+          model.projects.find((project) => project.id === msg.payload)
+        ),
+        O.map((selectedProject) => ({ ...model, selectedProject })),
+        O.getOrElse(() => model)
       )
-
-      return !selectedProject
-        ? model
-        : {
-            ...model,
-            selectedProject,
-          }
     }
     //-- todo cases
     case 'ADD_TODO': {
-      const { payload: project } = msg
-
       return {
         ...model,
-        todos: [
-          ...model.todos,
-          {
-            id: nanoid(),
-            title: getRandomName(),
-            projectId: project.id,
-            taskTime: [],
-            totalDuration: 0,
-          },
-        ],
+        todos: [...model.todos, newTodo(msg.payload)],
       }
     }
     case 'UPDATE_TODO': {
-      const { payload: todo } = msg
-
       return {
         ...model,
-        todos: model.todos.map((td) => (td.id === todo.id ? todo : td)),
+        todos: replaceTodo(model.todos, msg.payload),
       }
     }
     case 'DELETE_TODO': {
-      const { payload: todo } = msg
-
       return {
         ...model,
-        todos: model.todos.filter((td) => td.id !== todo.id),
+        todos: removeTodo(model.todos, msg.payload),
         deleteOp: undefined,
       }
     }
     case 'TODO_TIMER_START': {
-      console.log('TODO_TIMER_START')
-      const id = msg.payload
-      const todos = model.todos.map(
-        flow(
-          E.fromPredicate((todo) => todo.id !== id, identity),
-          E.map(todoStopTimer),
-          E.fold(
-            (todo) =>
-              todo.taskStartTime
-                ? todo
-                : {
-                    ...todo,
-                    taskStartTime: new Date(),
-                  },
-            identity
-          )
-        )
-      )
-
       return {
         ...model,
-        todos: todos,
+        todos: startTodoTimer(model.todos, msg.payload),
       }
     }
     case 'TODO_TIMER_STOP': {
-      console.log('TODO_TIMER_STOP')
-      const id = msg.payload
-      const todos = model.todos.map((todo) =>
-        todo.id === id ? todoStopTimer(todo) : todo
-      )
-
       return {
         ...model,
-        todos: todos,
+        todos: model.todos.map(todoStopTimer),
       }
     }
     case 'TODO_TIMER_CANCEL': {
-      const id = msg.payload
-      const todos = model.todos.map((todo) =>
-        todo.id !== id
-          ? todo
-          : {
-              ...todo,
-              taskStartTime: undefined,
-            }
-      )
-
       return {
         ...model,
-        todos: todos,
+        todos: model.todos.map(todoCancelTimer),
       }
     }
   }
