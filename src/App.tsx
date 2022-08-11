@@ -57,7 +57,7 @@ export type CustomOnChange<T> = {
 }
 
 export type WithDispatch = {
-  dispatch: React.Dispatch<Action>
+  dispatch: React.Dispatch<Actions>
 }
 
 //-- TODO
@@ -71,18 +71,28 @@ export type Todo = {
     end: Date
     duration: number
   }[]
+  lastWorked?: Date
   totalDuration: number
   taskStartTime?: Date
 }
 
 export type TodoCardProps = {
   onDelete?: (todo: Todo) => void
-  onTimer?: (todoId: ID, op: 'start' | 'stop' | 'cancel') => void
+  onTimerStart?: (id: ID) => void
+  onTimerStop?: (id: ID) => void
+  onTimerCancel?: (id: ID) => void
 }
 
 export const TodoCard: React.FC<
   CustomOnChange<Todo> & TodoCardProps & { todo: Todo }
-> = ({ onChange, onDelete, onTimer, todo }) => {
+> = ({
+  onChange,
+  onDelete,
+  onTimerStart,
+  onTimerStop,
+  onTimerCancel,
+  todo,
+}) => {
   return (
     <div className='todo-card'>
       <TextInput
@@ -95,13 +105,15 @@ export const TodoCard: React.FC<
           <FiTrash2 />
         </button>
         {!todo.taskStartTime ? null : (
-          <button onClick={() => onTimer?.(todo.id, 'cancel')}>
+          <button onClick={() => onTimerCancel?.(todo.id)}>
             <FiX />
           </button>
         )}
         <button
           onClick={() =>
-            onTimer?.(todo.id, todo.taskStartTime ? 'stop' : 'start')
+            todo.taskStartTime
+              ? onTimerStop?.(todo.id)
+              : onTimerStart?.(todo.id)
           }
         >
           {todo.taskStartTime ? <FiSquare /> : <FiPlay />}
@@ -116,8 +128,8 @@ export function todoStopTimer(todo: Todo): Todo {
     return todo
   }
 
-  const end = new Date()
-  const duration = differenceInMilliseconds(end, todo.taskStartTime)
+  const endTime = new Date()
+  const duration = differenceInMilliseconds(endTime, todo.taskStartTime)
 
   return {
     ...todo,
@@ -126,11 +138,12 @@ export function todoStopTimer(todo: Todo): Todo {
       ...todo.taskTime,
       {
         start: todo.taskStartTime,
-        end: end,
+        end: endTime,
         duration: duration,
       },
     ],
     totalDuration: todo.totalDuration + duration,
+    lastWorked: endTime,
   }
 }
 
@@ -222,7 +235,7 @@ export const TextInput: React.FC<
 export type ProjectCardProps = {
   project: Project
   todos: Todo[]
-  dispatch: React.Dispatch<Action>
+  dispatch: React.Dispatch<Actions>
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({
@@ -236,9 +249,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const [title, setTitle] = useState(project.title)
   const [description, setDescription] = useState(project.description)
 
-  // function handleChangeTitle(newTitle: string) {
-  //   setTitle(newTitle)
-  // }
   function handleChangeDescription(newDescription: string) {
     setDescription(newDescription)
   }
@@ -339,6 +349,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </nav>
         {todos.map((todo) => (
           <TodoCard
+            key={todo.id}
             todo={todo}
             onChange={(newTodo) =>
               dispatch({
@@ -346,16 +357,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 payload: newTodo,
               })
             }
-            onTimer={(id, op) => {
-              switch (op) {
-                case 'start':
-                  return dispatch({ type: 'TODO_TIMER_START', payload: id })
-                case 'stop':
-                  return dispatch({ type: 'TODO_TIMER_STOP', payload: id })
-                case 'cancel':
-                  return dispatch({ type: 'TODO_TIMER_CANCEL', payload: id })
-              }
-            }}
+            onTimerStart={flow(actionTodoTimerStart, dispatch)}
+            onTimerStop={flow(actionTodoTimerStop, dispatch)}
+            onTimerCancel={flow(actionTodoTimerCancel, dispatch)}
             onDelete={(todo) =>
               dispatch({
                 type: 'DELETE',
@@ -385,7 +389,7 @@ export const getDateValue = (date?: Date) => {
 
 //-- state reducer and stuff
 
-export type State = {
+export type Model = {
   projects: Project[]
   todos: Todo[]
   selectedProject: Project | null
@@ -394,49 +398,69 @@ export type State = {
 
 export type ID = string
 
-export type TodoAction =
-  | { type: 'TODO_TIMER_START'; payload: ID }
-  | { type: 'TODO_TIMER_STOP'; payload: ID }
-  | { type: 'TODO_TIMER_CANCEL'; payload: ID }
+export type TODO_TIMER_START = Action<'TODO_TIMER_START', ID>
+export type TODO_TIMER_STOP = Action<'TODO_TIMER_STOP', ID>
+export type TODO_TIMER_CANCEL = Action<'TODO_TIMER_CANCEL', ID>
+
+export type TodoAction = TODO_TIMER_START | TODO_TIMER_STOP | TODO_TIMER_CANCEL
 
 export type DeleteAction =
   | { type: 'DELETE_PROJECT'; payload: Project }
   | { type: 'DELETE_TODO'; payload: Todo }
 
-export type Action =
-  | { type: 'UPDATE_PROJECT'; payload: Project }
+export type Action<T extends string, P extends any> = { type: T; payload: P }
+
+export type UPDATE_PROJECT = Action<'UPDATE_PROJECT', Project>
+
+export type Actions =
+  | UPDATE_PROJECT
   | { type: 'DELETE_PROJECT'; payload: Project }
   | { type: 'DELETE'; payload?: DeleteAction }
-  | { type: 'ADD_NEW_PROJECT' }
+  | { type: 'ADD_NEW_PROJECT'; payload?: never }
   | { type: 'SELECT_PROJECT'; payload: Project | string }
   | { type: 'ADD_TODO'; payload: Project }
   | { type: 'UPDATE_TODO'; payload: Todo }
   | { type: 'DELETE_TODO'; payload: Todo }
   | TodoAction
 
-export function stateReducer(state: State, action: Action): State {
+type ExtractAction<A> = A extends Action<infer T, any> ? T : never
+
+export function actionCreator<T extends Actions>(type: T['type']) {
+  return (payload: T['payload']) => {
+    return { type, payload }
+  }
+}
+
+const updateProject = actionCreator<UPDATE_PROJECT>('UPDATE_PROJECT')
+
+const actionTodoTimerStart = actionCreator<TODO_TIMER_START>('TODO_TIMER_START')
+const actionTodoTimerStop = actionCreator<TODO_TIMER_STOP>('TODO_TIMER_STOP')
+const actionTodoTimerCancel =
+  actionCreator<TODO_TIMER_CANCEL>('TODO_TIMER_CANCEL')
+
+export function update(model: Model, action: Actions): Model {
   console.log('stateReducer:', action)
   switch (action.type) {
     default:
-      return state
+      return model
     case 'DELETE': {
       const deleteAction = action.payload
       return {
-        ...state,
+        ...model,
         deleteOp: deleteAction,
       }
     }
     case 'UPDATE_PROJECT': {
-      const { projects } = state
+      const { projects } = model
       const { payload: project } = action
 
       const selectedProject =
-        state.selectedProject?.id === project.id
+        model.selectedProject?.id === project.id
           ? project
-          : state.selectedProject
+          : model.selectedProject
 
       return {
-        ...state,
+        ...model,
         projects: projects.map((thisProject) =>
           thisProject.id === project.id ? project : thisProject
         ),
@@ -445,11 +469,11 @@ export function stateReducer(state: State, action: Action): State {
     }
     case 'DELETE_PROJECT': {
       console.log('DELETE_PROJECT', action.payload)
-      const projects = state.projects.filter(
+      const projects = model.projects.filter(
         (proj) => proj.id !== action.payload.id
       )
       return {
-        ...state,
+        ...model,
         projects,
         selectedProject: projects[0] ?? null,
         deleteOp: undefined,
@@ -464,22 +488,22 @@ export function stateReducer(state: State, action: Action): State {
       }
 
       return {
-        ...state,
-        projects: [...state.projects, newProject].sort(sortByTitle),
+        ...model,
+        projects: [...model.projects, newProject].sort(sortByTitle),
         selectedProject: newProject,
       }
     }
     case 'SELECT_PROJECT': {
       const { payload } = action
       const id = typeof payload === 'string' ? payload : payload.id
-      const selectedProject = state.projects.find(
+      const selectedProject = model.projects.find(
         (project) => project.id === id
       )
 
       return !selectedProject
-        ? state
+        ? model
         : {
-            ...state,
+            ...model,
             selectedProject,
           }
     }
@@ -488,9 +512,9 @@ export function stateReducer(state: State, action: Action): State {
       const { payload: project } = action
 
       return {
-        ...state,
+        ...model,
         todos: [
-          ...state.todos,
+          ...model.todos,
           {
             id: nanoid(),
             title: getRandomName(),
@@ -505,23 +529,23 @@ export function stateReducer(state: State, action: Action): State {
       const { payload: todo } = action
 
       return {
-        ...state,
-        todos: state.todos.map((td) => (td.id === todo.id ? todo : td)),
+        ...model,
+        todos: model.todos.map((td) => (td.id === todo.id ? todo : td)),
       }
     }
     case 'DELETE_TODO': {
       const { payload: todo } = action
 
       return {
-        ...state,
-        todos: state.todos.filter((td) => td.id !== todo.id),
+        ...model,
+        todos: model.todos.filter((td) => td.id !== todo.id),
         deleteOp: undefined,
       }
     }
     case 'TODO_TIMER_START': {
       console.log('TODO_TIMER_START')
       const id = action.payload
-      const todos = state.todos.map(
+      const todos = model.todos.map(
         flow(
           E.fromPredicate((todo) => todo.id !== id, identity),
           E.map(todoStopTimer),
@@ -539,25 +563,25 @@ export function stateReducer(state: State, action: Action): State {
       )
 
       return {
-        ...state,
+        ...model,
         todos: todos,
       }
     }
     case 'TODO_TIMER_STOP': {
       console.log('TODO_TIMER_STOP')
       const id = action.payload
-      const todos = state.todos.map((todo) =>
+      const todos = model.todos.map((todo) =>
         todo.id === id ? todoStopTimer(todo) : todo
       )
 
       return {
-        ...state,
+        ...model,
         todos: todos,
       }
     }
     case 'TODO_TIMER_CANCEL': {
       const id = action.payload
-      const todos = state.todos.map((todo) =>
+      const todos = model.todos.map((todo) =>
         todo.id !== id
           ? todo
           : {
@@ -567,7 +591,7 @@ export function stateReducer(state: State, action: Action): State {
       )
 
       return {
-        ...state,
+        ...model,
         todos: todos,
       }
     }
@@ -575,7 +599,7 @@ export function stateReducer(state: State, action: Action): State {
 }
 
 const DeleteModal: React.FC<{
-  dispatch: React.Dispatch<Action>
+  dispatch: React.Dispatch<Actions>
   deleteAction?: DeleteAction
 }> = ({ dispatch, deleteAction }) => {
   return (
@@ -612,10 +636,9 @@ const DeleteModal: React.FC<{
 const App = () => {
   const deleteDialogRef = useRef<React.LegacyRef<HTMLDialogElement>>(null)
 
-  const [state, dispatch] = useReducer<(state: State, action: Action) => State>(
-    stateReducer,
-    { projects: [], todos: [], selectedProject: null }
-  )
+  const [state, dispatch] = useReducer<
+    (state: Model, action: Actions) => Model
+  >(update, { projects: [], todos: [], selectedProject: null })
 
   const { projects, selectedProject } = state
 
