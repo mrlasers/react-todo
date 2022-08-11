@@ -1,3 +1,6 @@
+export * from './update'
+import { ID, Project } from '../App'
+
 const adjectives = [
   'Androgynous',
   'Big Booty',
@@ -105,4 +108,20 @@ export function getRandomName(): string {
   const name = adjective + ' ' + animal
 
   return name
+}
+
+export function isMatchProjectId(id: ID) {
+  return (item: { projectId: ID }): boolean => item.projectId === id
+}
+
+export const sortByTitle = (a: Project, b: Project) =>
+  a.title > b.title ? 1 : -1
+
+export const getDateValue = (date?: Date) => {
+  const now = date ?? new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const day = now.getDate()
+
+  return `${year}-${month}-${day}`
 }

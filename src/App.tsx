@@ -1,18 +1,10 @@
 // import reactLogo from './assets/react.svg'
 import './App.scss'
 
-import {
-  differenceInDays,
-  differenceInMilliseconds,
-  differenceInMinutes,
-  differenceInSeconds,
-  format,
-  isDate,
-} from 'date-fns'
-import * as E from 'fp-ts/Either'
-import { flow, identity, pipe } from 'fp-ts/lib/function'
+import { differenceInDays, format } from 'date-fns'
+import * as A from 'fp-ts/Array'
+import { flow, pipe } from 'fp-ts/lib/function'
 import * as O from 'fp-ts/Option'
-import { nanoid } from 'nanoid'
 import {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -21,32 +13,21 @@ import {
   useRef,
   useState,
 } from 'react'
-import {
-  FiClock,
-  FiDelete,
-  FiMenu,
-  FiPause,
-  FiPlay,
-  FiPlus,
-  FiPlusCircle,
-  FiSquare,
-  FiStopCircle,
-  FiTrash2,
-  FiWatch,
-  FiX,
-} from 'react-icons/fi'
+import { FiClock, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi'
 import Modal from 'react-modal'
 
-import { getRandomName } from './helpers'
 import {
+  getDateValue,
+  isMatchProjectId,
   newProject,
   newTodo,
   removeTodo,
   replaceTodo,
+  sortByTitle,
   startTodoTimer,
   todoCancelTimer,
   todoStopTimer,
-} from './helpers/update'
+} from './helpers'
 
 Modal.setAppElement('#root')
 
@@ -174,7 +155,6 @@ export const DueDatePicker: React.FC<
         }}
       />
       <FiClock /> <span>{value && format(new Date(value), 'MMM d')}</span>
-      {/* {children} */}
     </button>
   )
 }
@@ -228,7 +208,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   todos,
   dispatch,
 }) => {
-  const inputEl = useRef<HTMLInputElement>(null)
   const textareaEl = useRef<HTMLTextAreaElement>(null)
   const [isCtrlsActive, setIsCtrlsActive] = useState(false)
   const [title, setTitle] = useState(project.title)
@@ -254,8 +233,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     })
   }
 
-  const [showDatePicker, setShowDatePicker] = useState(false)
-
   useEffect(() => {
     setTitle(project.title)
     setDescription(project.description)
@@ -279,15 +256,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         <nav>
           <DueDatePicker
             value={project.dueDate}
-            onChange={(date) =>
-              dispatch({
-                type: 'UPDATE_PROJECT',
-                payload: {
-                  ...project,
-                  dueDate: date,
-                },
-              })
-            }
+            onChange={flow(
+              (dueDate) => ({ ...project, dueDate }),
+              msgUpdateProject,
+              dispatch
+            )}
           >
             <FiClock />
           </DueDatePicker>
@@ -337,27 +310,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   )
 }
 
-//-- little helper functions
-
-export const sortByTitle = (a: Project, b: Project) =>
-  a.title > b.title ? 1 : -1
-
-export const getDateValue = (date?: Date) => {
-  const now = date ?? new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  const day = now.getDate()
-
-  return `${year}-${month}-${day}`
-}
-
 //-- state reducer and stuff
 
 export type Model = {
   projects: Project[]
   todos: Todo[]
   selectedProject: Project | null
-  deleteOp?: DeleteMsg
+  deleteOp?: RemoveMsg
 }
 
 export type ID = string
@@ -368,35 +327,33 @@ export type TODO_TIMER_CANCEL = msg<'TODO_TIMER_CANCEL', ID>
 
 export type TodoMsg = TODO_TIMER_START | TODO_TIMER_STOP | TODO_TIMER_CANCEL
 
-export type DeleteMsgProject = { type: 'DELETE_PROJECT'; payload: Project }
-export type DeleteMsgTodo = { type: 'DELETE_TODO'; payload: Todo }
+export type RemoveMsgProject = { type: 'REMOVE_PROJECT'; payload: Project }
+export type RemoveMsgTodo = { type: 'REMOVE_TODO'; payload: Todo }
 
-export type DeleteMsg = DeleteMsgProject | DeleteMsgTodo
+export type RemoveMsg = RemoveMsgProject | RemoveMsgTodo
 
 export type msg<T extends string, P extends any> = { type: T; payload: P }
 
+export type ADD_NEW_PROJECT = msg<'ADD_NEW_PROJECT', undefined>
 export type UPDATE_PROJECT = msg<'UPDATE_PROJECT', Project>
-export type DELETE_PROJECT = msg<'DELETE_PROJECT', Project>
+export type REMOVE_PROJECT = msg<'REMOVE_PROJECT', Project>
 
 export type SELECT_PROJECT = msg<'SELECT_PROJECT', ID>
-export type DELETE_SOMETHING = msg<'DELETE_SOMETHING', DeleteMsg | undefined>
+export type DELETE_SOMETHING = msg<'DELETE_SOMETHING', RemoveMsg | undefined>
 
 export type ADD_TODO = msg<'ADD_TODO', Project>
 export type UPDATE_TODO = msg<'UPDATE_TODO', Todo>
+export type REMOVE_TODO = msg<'REMOVE_TODO', Todo>
 
 export type Msg =
   | UPDATE_PROJECT
-  | DELETE_PROJECT
-  // | { type: 'DELETE'; payload?: DeleteMsg }
   | DELETE_SOMETHING
-  | { type: 'ADD_NEW_PROJECT'; payload?: never }
-  // | { type: 'SELECT_PROJECT'; payload: Project | string }
+  | ADD_NEW_PROJECT
   | SELECT_PROJECT
-  // | { type: 'ADD_TODO'; payload: Project }
   | ADD_TODO
   | UPDATE_TODO
-  | { type: 'DELETE_TODO'; payload: Todo }
   | TodoMsg
+  | RemoveMsg
 
 export function msgCreator<T extends Msg>(type: T['type']) {
   return (payload: T['payload']) => {
@@ -404,8 +361,9 @@ export function msgCreator<T extends Msg>(type: T['type']) {
   }
 }
 
-const updateProject = msgCreator<UPDATE_PROJECT>('UPDATE_PROJECT')
-const deleteProject = msgCreator<DELETE_PROJECT>('DELETE_PROJECT')
+const msgAddNewProject = () =>
+  msgCreator<ADD_NEW_PROJECT>('ADD_NEW_PROJECT')(undefined)
+const msgUpdateProject = msgCreator<UPDATE_PROJECT>('UPDATE_PROJECT')
 
 const msgTodoTimerStart = msgCreator<TODO_TIMER_START>('TODO_TIMER_START')
 const msgTodoTimerStop = msgCreator<TODO_TIMER_STOP>('TODO_TIMER_STOP')
@@ -422,24 +380,68 @@ const msgDeleteSomething = <T extends DELETE_SOMETHING>(
 
 const msgDeleteProject = (project: Project) =>
   msgCreator<DELETE_SOMETHING>('DELETE_SOMETHING')({
-    type: 'DELETE_PROJECT',
+    type: 'REMOVE_PROJECT',
     payload: project,
   })
 const msgDeleteTodo = (todo: Todo) =>
   msgCreator<DELETE_SOMETHING>('DELETE_SOMETHING')({
-    type: 'DELETE_TODO',
+    type: 'REMOVE_TODO',
     payload: todo,
   })
+
+export function updateTodo(model: Model, { type, payload }: Msg): Model {
+  switch (type) {
+    default:
+      return model
+
+    case 'ADD_TODO': {
+      return {
+        ...model,
+        todos: [...model.todos, newTodo(payload)],
+      }
+    }
+    case 'UPDATE_TODO': {
+      return {
+        ...model,
+        todos: replaceTodo(model.todos, payload),
+      }
+    }
+    case 'REMOVE_TODO': {
+      return {
+        ...model,
+        todos: removeTodo(model.todos, payload),
+        deleteOp: undefined,
+      }
+    }
+    case 'TODO_TIMER_START': {
+      return {
+        ...model,
+        todos: startTodoTimer(model.todos, payload),
+      }
+    }
+    case 'TODO_TIMER_STOP': {
+      return {
+        ...model,
+        todos: model.todos.map(todoStopTimer),
+      }
+    }
+    case 'TODO_TIMER_CANCEL': {
+      return {
+        ...model,
+        todos: model.todos.map(todoCancelTimer),
+      }
+    }
+  }
+}
 
 export function update(model: Model, msg: Msg): Model {
   switch (msg.type) {
     default:
-      return model
+      return updateTodo(model, msg)
     case 'DELETE_SOMETHING': {
-      const deleteAction = msg.payload
       return {
         ...model,
-        deleteOp: deleteAction,
+        deleteOp: msg.payload,
       }
     }
     case 'UPDATE_PROJECT': {
@@ -454,7 +456,7 @@ export function update(model: Model, msg: Msg): Model {
             : model.selectedProject,
       }
     }
-    case 'DELETE_PROJECT': {
+    case 'REMOVE_PROJECT': {
       return pipe(
         model.projects.filter((proj) => proj.id !== msg.payload.id),
         (projects) => ({
@@ -481,50 +483,12 @@ export function update(model: Model, msg: Msg): Model {
         O.getOrElse(() => model)
       )
     }
-    //-- todo cases
-    case 'ADD_TODO': {
-      return {
-        ...model,
-        todos: [...model.todos, newTodo(msg.payload)],
-      }
-    }
-    case 'UPDATE_TODO': {
-      return {
-        ...model,
-        todos: replaceTodo(model.todos, msg.payload),
-      }
-    }
-    case 'DELETE_TODO': {
-      return {
-        ...model,
-        todos: removeTodo(model.todos, msg.payload),
-        deleteOp: undefined,
-      }
-    }
-    case 'TODO_TIMER_START': {
-      return {
-        ...model,
-        todos: startTodoTimer(model.todos, msg.payload),
-      }
-    }
-    case 'TODO_TIMER_STOP': {
-      return {
-        ...model,
-        todos: model.todos.map(todoStopTimer),
-      }
-    }
-    case 'TODO_TIMER_CANCEL': {
-      return {
-        ...model,
-        todos: model.todos.map(todoCancelTimer),
-      }
-    }
   }
 }
 
 const DeleteModal: React.FC<{
   dispatch: React.Dispatch<Msg>
-  deleteMsg: DeleteMsg
+  deleteMsg: RemoveMsg
 }> = ({ dispatch, deleteMsg: deleteAction }) => {
   return (
     <Modal
@@ -536,14 +500,13 @@ const DeleteModal: React.FC<{
       overlayClassName='Overlay'
     >
       <h2>
-        Delete {deleteAction?.type === 'DELETE_PROJECT' ? 'Project' : 'Todo???'}{' '}
+        Delete {deleteAction?.type === 'REMOVE_PROJECT' ? 'Project' : 'Todo???'}{' '}
         <em>{deleteAction?.payload.title}</em>
       </h2>
       <div className='buttons'>
         <button
           className='soft-button'
           onClick={flow(() => msgDeleteSomething(undefined), dispatch)}
-          // onClick={() => dispatch({ type: 'DELETE_SOMETHING' })}
         >
           Cancel
         </button>
@@ -558,20 +521,20 @@ const DeleteModal: React.FC<{
   )
 }
 
-const App = () => {
-  const deleteDialogRef = useRef<React.LegacyRef<HTMLDialogElement>>(null)
+const initialModel: Model = { projects: [], todos: [], selectedProject: null }
 
-  const [state, dispatch] = useReducer<(state: Model, action: Msg) => Model>(
+const App = () => {
+  const [model, dispatch] = useReducer<(model: Model, msg: Msg) => Model>(
     update,
-    { projects: [], todos: [], selectedProject: null }
+    initialModel
   )
 
-  const { projects, selectedProject } = state
+  const { projects, selectedProject } = model
 
   return (
     <>
-      {state.deleteOp && (
-        <DeleteModal dispatch={dispatch} deleteMsg={state.deleteOp} />
+      {model.deleteOp && (
+        <DeleteModal dispatch={dispatch} deleteMsg={model.deleteOp} />
       )}
       <header>
         <nav>
@@ -593,7 +556,7 @@ const App = () => {
                 ))}
               </select>
             ) : null}
-            <button onClick={() => dispatch({ type: 'ADD_NEW_PROJECT' })}>
+            <button onClick={flow(msgAddNewProject, dispatch)}>
               New Project
             </button>
           </div>
@@ -603,15 +566,17 @@ const App = () => {
         {selectedProject && (
           <ProjectCard
             project={selectedProject}
-            todos={state.todos.filter(
-              (td) => td.projectId === selectedProject.id
+            todos={pipe(
+              model.todos,
+              A.partition(isMatchProjectId(selectedProject.id)),
+              ({ right }) => right
             )}
             dispatch={dispatch}
           />
         )}
 
         <code>
-          <pre>{JSON.stringify(state.todos, null, 2)}</pre>
+          <pre>{JSON.stringify(model.todos, null, 2)}</pre>
         </code>
       </main>
     </>
