@@ -14,6 +14,13 @@ export function removeTodo(todos: Todo[], todo: Todo): Todo[] {
   return todos.filter((td) => td.id !== todo.id)
 }
 
+export function replaceProject(
+  projects: Project[],
+  project: Project
+): Project[] {
+  return projects.filter((proj) => proj.id !== project.id)
+}
+
 export function startTodoTimer(todos: Todo[], id: ID): Todo[] {
   return todos.map(
     flow(

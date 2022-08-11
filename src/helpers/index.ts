@@ -1,5 +1,8 @@
 export * from './update'
-import { ID, Project } from '../App'
+import * as A from 'fp-ts/Array'
+import { pipe } from 'fp-ts/lib/function'
+
+import { ID, Project, Todo } from '../App'
 
 const adjectives = [
   'Androgynous',
@@ -110,6 +113,10 @@ export function getRandomName(): string {
   return name
 }
 
+export function isMatchId(id: ID) {
+  return (item: { id: ID }): boolean => item.id === id
+}
+
 export function isMatchProjectId(id: ID) {
   return (item: { projectId: ID }): boolean => item.projectId === id
 }
@@ -124,4 +131,12 @@ export const getDateValue = (date?: Date) => {
   const day = now.getDate()
 
   return `${year}-${month}-${day}`
+}
+
+export function getProjectTodos(todos: Todo[], projectId: ID) {
+  return pipe(
+    todos,
+    A.partition(isMatchProjectId(projectId)),
+    ({ right }) => right
+  )
 }

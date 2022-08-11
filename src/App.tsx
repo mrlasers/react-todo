@@ -2,12 +2,12 @@
 import './App.scss'
 
 import { differenceInDays, format } from 'date-fns'
+import { guard } from 'fp-ts-std/Function'
 import * as A from 'fp-ts/Array'
 import { flow, pipe } from 'fp-ts/lib/function'
 import * as O from 'fp-ts/Option'
 import {
   ButtonHTMLAttributes,
-  InputHTMLAttributes,
   useEffect,
   useReducer,
   useRef,
@@ -18,10 +18,12 @@ import Modal from 'react-modal'
 
 import {
   getDateValue,
+  getProjectTodos,
   isMatchProjectId,
   newProject,
   newTodo,
   removeTodo,
+  replaceProject,
   replaceTodo,
   sortByTitle,
   startTodoTimer,
@@ -37,8 +39,6 @@ export type Project = {
   description: string
   dueDate: string | null
 }
-
-export type ProjectKeys = keyof Exclude<Project, 'id'>
 
 //-- components
 
@@ -94,7 +94,7 @@ export const TodoCard: React.FC<
         <button onClick={() => onDelete?.(todo)}>
           <FiTrash2 />
         </button>
-        {!todo.taskStartTime ? null : (
+        {todo.taskStartTime && (
           <button onClick={() => onTimerCancel?.(todo.id)}>
             <FiX />
           </button>
@@ -119,40 +119,46 @@ export const DueDatePicker: React.FC<
 > = (props) => {
   const { children, onChange, value, ...attrs } = props
 
-  const daysLeft = !value
-    ? null
-    : differenceInDays(new Date(value), new Date(getDateValue()))
+  // might want to combine maybeDaysLeft and buttonClassName into one pipe
+  // but leaving here for now because i might also want the number of days left
+  const maybeDaysLeft = pipe(
+    O.fromNullable(value),
+    O.map((date) => differenceInDays(new Date(date), new Date(getDateValue())))
+  )
+
+  const buttonClassName = pipe(
+    maybeDaysLeft,
+    O.map(
+      guard<number, string>([
+        [(n) => n <= 1, () => 'warn'],
+        [(n) => n <= 7, () => 'chill'],
+      ])(() => '')
+    ),
+    O.getOrElse(() => '')
+  )
+
+  const buttonStyle: React.CSSProperties = { position: 'relative' }
+
+  const inputStyle: React.CSSProperties = {
+    opacity: 0,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 9999999,
+  }
 
   return (
-    <button
-      {...attrs}
-      className={
-        !daysLeft ? '' : daysLeft <= 1 ? 'warn' : daysLeft <= 7 ? 'chill' : ''
-      }
-      style={{ position: 'relative' }}
-    >
+    <button {...attrs} className={buttonClassName} style={buttonStyle}>
       <input
         required
         value={value ?? ''}
         type='date'
-        onChange={(e) => {
-          onChange && onChange(e.target.value)
-        }}
-        onClick={(e) => {
-          console.log('click')
-        }}
-        style={{
-          opacity: 0,
-          // border: 0,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100%',
-          height: '100%',
-          zIndex: 9999999,
-        }}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={inputStyle}
       />
       <FiClock /> <span>{value && format(new Date(value), 'MMM d')}</span>
     </button>
@@ -238,75 +244,77 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     setDescription(project.description)
   }, [project])
 
-  return project === null ? null : (
-    <div className='project-card'>
-      <div className={'header' + (isCtrlsActive ? ' active' : '')}>
-        <TextInput
-          type='text'
-          className='project-title'
-          value={title}
-          onBlur={handleOnChange}
-          onChange={(title) => {
-            return dispatch({
-              type: 'UPDATE_PROJECT',
-              payload: { ...project, title: title },
-            })
-          }}
-        />
-        <nav>
-          <DueDatePicker
-            value={project.dueDate}
-            onChange={flow(
-              (dueDate) => ({ ...project, dueDate }),
-              msgUpdateProject,
-              dispatch
-            )}
-          >
-            <FiClock />
-          </DueDatePicker>
-          <button
-            title='Delete?'
-            onClick={flow(() => msgDeleteProject(project), dispatch)}
-          >
-            <FiTrash2 />
-          </button>
-        </nav>
-      </div>
-      <div className='description'>
-        <textarea
-          ref={textareaEl}
-          spellCheck={false}
-          placeholder='Enter description, notes, etc., here...'
-          value={description}
-          onBlur={handleOnChange}
-          onKeyDown={(e) =>
-            e.key === 'Escape' &&
-            textareaEl.current &&
-            textareaEl.current.blur()
-          }
-          onInput={(e) => handleChangeDescription(e.currentTarget.value)}
-        ></textarea>
-      </div>
-      <div className='todos-list'>
-        <h3>Todos</h3>
-        <nav>
-          <button onClick={flow(() => msgAddTodo(project), dispatch)}>
-            Add Task
-          </button>
-        </nav>
-        {todos.map((todo) => (
-          <TodoCard
-            key={todo.id}
-            todo={todo}
-            onChange={flow(msgUpdateTodo, dispatch)}
-            onTimerStart={flow(msgTodoTimerStart, dispatch)}
-            onTimerStop={flow(msgTodoTimerStop, dispatch)}
-            onTimerCancel={flow(msgTodoTimerCancel, dispatch)}
-            onDelete={flow(() => msgDeleteTodo(todo), dispatch)}
+  return (
+    project && (
+      <div className='project-card'>
+        <div className={'header' + (isCtrlsActive ? ' active' : '')}>
+          <TextInput
+            type='text'
+            className='project-title'
+            value={title}
+            onBlur={handleOnChange}
+            onChange={(title) => {
+              return dispatch({
+                type: 'UPDATE_PROJECT',
+                payload: { ...project, title: title },
+              })
+            }}
           />
-        ))}
+          <nav>
+            <DueDatePicker
+              value={project.dueDate}
+              onChange={flow(
+                (dueDate) => ({ ...project, dueDate }),
+                msgUpdateProject,
+                dispatch
+              )}
+            >
+              <FiClock />
+            </DueDatePicker>
+            <button
+              title='Delete?'
+              onClick={flow(() => msgDeleteProject(project), dispatch)}
+            >
+              <FiTrash2 />
+            </button>
+          </nav>
+        </div>
+        <div className='description'>
+          <textarea
+            ref={textareaEl}
+            spellCheck={false}
+            placeholder='Enter description, notes, etc., here...'
+            value={description}
+            onBlur={handleOnChange}
+            onKeyDown={(e) =>
+              e.key === 'Escape' &&
+              textareaEl.current &&
+              textareaEl.current.blur()
+            }
+            onInput={(e) => handleChangeDescription(e.currentTarget.value)}
+          ></textarea>
+        </div>
+        <div className='todos-list'>
+          <h3>Todos</h3>
+          <nav>
+            <button onClick={flow(() => msgAddTodo(project), dispatch)}>
+              Add Task
+            </button>
+          </nav>
+          {todos.map((todo) => (
+            <TodoCard
+              key={todo.id}
+              todo={todo}
+              onChange={flow(msgUpdateTodo, dispatch)}
+              onTimerStart={flow(msgTodoTimerStart, dispatch)}
+              onTimerStop={flow(msgTodoTimerStop, dispatch)}
+              onTimerCancel={flow(msgTodoTimerCancel, dispatch)}
+              onDelete={flow(() => msgDeleteTodo(todo), dispatch)}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    )
   )
 }
 
@@ -445,6 +453,8 @@ export function update(model: Model, msg: Msg): Model {
       }
     }
     case 'UPDATE_PROJECT': {
+      // we're doing the same thing in the map as we're doing to get selectedProject
+      // should probably dry this shit out
       return {
         ...model,
         projects: model.projects.map((thisProject) =>
@@ -457,15 +467,13 @@ export function update(model: Model, msg: Msg): Model {
       }
     }
     case 'REMOVE_PROJECT': {
-      return pipe(
-        model.projects.filter((proj) => proj.id !== msg.payload.id),
-        (projects) => ({
-          ...model,
-          projects,
-          selectedProject: projects[0] ?? null,
-          deleteOp: undefined,
-        })
-      )
+      return pipe(replaceProject(model.projects, msg.payload), (projects) => ({
+        ...model,
+        projects,
+        todos: model.todos.filter(isMatchProjectId(projects[0]?.id)),
+        selectedProject: projects[0] ?? null,
+        deleteOp: undefined,
+      }))
     }
     case 'ADD_NEW_PROJECT': {
       return pipe(newProject(), (project) => ({
@@ -495,7 +503,7 @@ const DeleteModal: React.FC<{
       isOpen={!!deleteAction}
       shouldCloseOnEsc={true}
       shouldCloseOnOverlayClick={true}
-      onRequestClose={flow(() => msgDeleteSomething(undefined), dispatch)}
+      onRequestClose={flow(() => msgDeleteSomething(), dispatch)}
       className='Modal'
       overlayClassName='Overlay'
     >
@@ -506,14 +514,11 @@ const DeleteModal: React.FC<{
       <div className='buttons'>
         <button
           className='soft-button'
-          onClick={flow(() => msgDeleteSomething(undefined), dispatch)}
+          onClick={flow(() => msgDeleteSomething(), dispatch)}
         >
           Cancel
         </button>
-        <button
-          className='soft-button'
-          onClick={() => deleteAction && dispatch(deleteAction)}
-        >
+        <button className='soft-button' onClick={() => dispatch(deleteAction)}>
           Confirm
         </button>
       </div>
@@ -540,7 +545,7 @@ const App = () => {
         <nav>
           <h1>Project Tracker</h1>
           <div className='project-controls'>
-            {projects.length ? (
+            {!!projects.length && (
               <select
                 value={selectedProject?.id}
                 onChange={flow(
@@ -555,7 +560,7 @@ const App = () => {
                   </option>
                 ))}
               </select>
-            ) : null}
+            )}
             <button onClick={flow(msgAddNewProject, dispatch)}>
               New Project
             </button>
@@ -566,11 +571,7 @@ const App = () => {
         {selectedProject && (
           <ProjectCard
             project={selectedProject}
-            todos={pipe(
-              model.todos,
-              A.partition(isMatchProjectId(selectedProject.id)),
-              ({ right }) => right
-            )}
+            todos={getProjectTodos(model.todos, selectedProject.id)}
             dispatch={dispatch}
           />
         )}
