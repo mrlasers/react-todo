@@ -1,7 +1,17 @@
 // import reactLogo from './assets/react.svg'
 import './App.scss'
 
-import { differenceInDays, format } from 'date-fns'
+import {
+  differenceInDays,
+  differenceInMilliseconds,
+  differenceInMinutes,
+  differenceInSeconds,
+  format,
+  isDate,
+} from 'date-fns'
+import * as E from 'fp-ts/Either'
+import { flow, identity, pipe } from 'fp-ts/lib/function'
+import * as O from 'fp-ts/Option'
 import { nanoid } from 'nanoid'
 import {
   ButtonHTMLAttributes,
@@ -19,6 +29,8 @@ import {
   FiPlay,
   FiPlus,
   FiPlusCircle,
+  FiSquare,
+  FiStopCircle,
   FiTrash2,
   FiWatch,
   FiX,
@@ -38,12 +50,6 @@ export type Project = {
 
 export type ProjectKeys = keyof Exclude<Project, 'id'>
 
-export type Todo = {
-  id: string
-  title: string
-  projectId: string
-}
-
 //-- components
 
 export type CustomOnChange<T> = {
@@ -54,10 +60,29 @@ export type WithDispatch = {
   dispatch: React.Dispatch<Action>
 }
 
-export const TodoCard: React.FC<CustomOnChange<Todo> & { todo: Todo }> = ({
-  onChange,
-  todo,
-}) => {
+//-- TODO
+
+export type Todo = {
+  id: string
+  title: string
+  projectId: string
+  taskTime: {
+    start: Date
+    end: Date
+    duration: number
+  }[]
+  totalDuration: number
+  taskStartTime?: Date
+}
+
+export type TodoCardProps = {
+  onDelete?: (todo: Todo) => void
+  onTimer?: (todoId: ID, op: 'start' | 'stop' | 'cancel') => void
+}
+
+export const TodoCard: React.FC<
+  CustomOnChange<Todo> & TodoCardProps & { todo: Todo }
+> = ({ onChange, onDelete, onTimer, todo }) => {
   return (
     <div className='todo-card'>
       <TextInput
@@ -65,11 +90,48 @@ export const TodoCard: React.FC<CustomOnChange<Todo> & { todo: Todo }> = ({
         value={todo.title}
         onChange={(title) => onChange && onChange({ ...todo, title })}
       />
-      <button>
-        <FiPlay />
-      </button>
+      <div>
+        <button onClick={() => onDelete?.(todo)}>
+          <FiTrash2 />
+        </button>
+        {!todo.taskStartTime ? null : (
+          <button onClick={() => onTimer?.(todo.id, 'cancel')}>
+            <FiX />
+          </button>
+        )}
+        <button
+          onClick={() =>
+            onTimer?.(todo.id, todo.taskStartTime ? 'stop' : 'start')
+          }
+        >
+          {todo.taskStartTime ? <FiSquare /> : <FiPlay />}
+        </button>
+      </div>
     </div>
   )
+}
+
+export function todoStopTimer(todo: Todo): Todo {
+  if (!todo.taskStartTime) {
+    return todo
+  }
+
+  const end = new Date()
+  const duration = differenceInMilliseconds(end, todo.taskStartTime)
+
+  return {
+    ...todo,
+    taskStartTime: undefined,
+    taskTime: [
+      ...todo.taskTime,
+      {
+        start: todo.taskStartTime,
+        end: end,
+        duration: duration,
+      },
+    ],
+    totalDuration: todo.totalDuration + duration,
+  }
 }
 
 export const DueDatePicker: React.FC<
@@ -284,6 +346,22 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 payload: newTodo,
               })
             }
+            onTimer={(id, op) => {
+              switch (op) {
+                case 'start':
+                  return dispatch({ type: 'TODO_TIMER_START', payload: id })
+                case 'stop':
+                  return dispatch({ type: 'TODO_TIMER_STOP', payload: id })
+                case 'cancel':
+                  return dispatch({ type: 'TODO_TIMER_CANCEL', payload: id })
+              }
+            }}
+            onDelete={(todo) =>
+              dispatch({
+                type: 'DELETE',
+                payload: { type: 'DELETE_TODO', payload: todo },
+              })
+            }
           />
         ))}
       </div>
@@ -314,6 +392,13 @@ export type State = {
   deleteOp?: DeleteAction
 }
 
+export type ID = string
+
+export type TodoAction =
+  | { type: 'TODO_TIMER_START'; payload: ID }
+  | { type: 'TODO_TIMER_STOP'; payload: ID }
+  | { type: 'TODO_TIMER_CANCEL'; payload: ID }
+
 export type DeleteAction =
   | { type: 'DELETE_PROJECT'; payload: Project }
   | { type: 'DELETE_TODO'; payload: Todo }
@@ -327,12 +412,20 @@ export type Action =
   | { type: 'ADD_TODO'; payload: Project }
   | { type: 'UPDATE_TODO'; payload: Todo }
   | { type: 'DELETE_TODO'; payload: Todo }
+  | TodoAction
 
 export function stateReducer(state: State, action: Action): State {
   console.log('stateReducer:', action)
   switch (action.type) {
     default:
       return state
+    case 'DELETE': {
+      const deleteAction = action.payload
+      return {
+        ...state,
+        deleteOp: deleteAction,
+      }
+    }
     case 'UPDATE_PROJECT': {
       const { projects } = state
       const { payload: project } = action
@@ -390,6 +483,7 @@ export function stateReducer(state: State, action: Action): State {
             selectedProject,
           }
     }
+    //-- todo cases
     case 'ADD_TODO': {
       const { payload: project } = action
 
@@ -401,6 +495,8 @@ export function stateReducer(state: State, action: Action): State {
             id: nanoid(),
             title: getRandomName(),
             projectId: project.id,
+            taskTime: [],
+            totalDuration: 0,
           },
         ],
       }
@@ -413,11 +509,66 @@ export function stateReducer(state: State, action: Action): State {
         todos: state.todos.map((td) => (td.id === todo.id ? todo : td)),
       }
     }
-    case 'DELETE': {
-      const deleteAction = action.payload
+    case 'DELETE_TODO': {
+      const { payload: todo } = action
+
       return {
         ...state,
-        deleteOp: deleteAction,
+        todos: state.todos.filter((td) => td.id !== todo.id),
+        deleteOp: undefined,
+      }
+    }
+    case 'TODO_TIMER_START': {
+      console.log('TODO_TIMER_START')
+      const id = action.payload
+      const todos = state.todos.map(
+        flow(
+          E.fromPredicate((todo) => todo.id !== id, identity),
+          E.map(todoStopTimer),
+          E.fold(
+            (todo) =>
+              todo.taskStartTime
+                ? todo
+                : {
+                    ...todo,
+                    taskStartTime: new Date(),
+                  },
+            identity
+          )
+        )
+      )
+
+      return {
+        ...state,
+        todos: todos,
+      }
+    }
+    case 'TODO_TIMER_STOP': {
+      console.log('TODO_TIMER_STOP')
+      const id = action.payload
+      const todos = state.todos.map((todo) =>
+        todo.id === id ? todoStopTimer(todo) : todo
+      )
+
+      return {
+        ...state,
+        todos: todos,
+      }
+    }
+    case 'TODO_TIMER_CANCEL': {
+      const id = action.payload
+      const todos = state.todos.map((todo) =>
+        todo.id !== id
+          ? todo
+          : {
+              ...todo,
+              taskStartTime: undefined,
+            }
+      )
+
+      return {
+        ...state,
+        todos: todos,
       }
     }
   }
@@ -468,12 +619,6 @@ const App = () => {
 
   const { projects, selectedProject } = state
 
-  // useEffect(() => {
-  //   if (state.deleteOp) {
-  //     deleteDialogRef.current?.showModal()
-  //   }
-  // }, [state.deleteOp])
-
   return (
     <>
       <DeleteModal dispatch={dispatch} deleteAction={state.deleteOp} />
@@ -515,86 +660,6 @@ const App = () => {
         <code>
           <pre>{JSON.stringify(state.todos, null, 2)}</pre>
         </code>
-
-        {/* <hr />
-        <section className='project-card'>
-          <div className='header'>
-            <div>
-              <input
-                type='text'
-                className='project-title'
-                value='Project Title'
-              />
-            </div>
-            <div className='button'>
-              <FiMenu />
-            </div>
-          </div>
-          <div className='description'>
-            <textarea spellCheck={false}>
-              Lorem ipsum dolor sit amet consectetur, adipisicing elit.
-              Perferendis dolores laborum illo fuga, suscipit ut in! Ea possimus
-              nesciunt fugit incidunt quae eum iste. Reprehenderit esse
-              consequatur, porro deserunt fugiat omnis corporis? Exercitationem,
-              deleniti? Excepturi, recusandae. Repellendus porro possimus vitae
-              vero iure nulla provident nam?
-            </textarea>
-          </div>
-        </section>
-        <section className='task-list'>
-          <ul>
-            <li className='active'>
-              <input
-                className='title'
-                type='text'
-                defaultValue='Work on some todo app'
-              />
-              <div className='time'>
-                3 <FiWatch /> 0:15:32
-              </div>
-              <nav className='task-ctrls'>
-                <span className='button'>
-                  <FiX />
-                </span>
-                <span className='button'>
-                  <FiPause />
-                </span>
-              </nav>
-            </li>
-            <li className='new-task'>
-              <input type='text' className='title' />
-              <nav className='task-ctrls'>
-                <span className='button' title='Add task'>
-                  <FiPlus />
-                </span>
-                <span
-                  className='button'
-                  title='Add task and start time tracking'
-                >
-                  <FiPlay />
-                </span>
-              </nav>
-            </li>
-            <li>
-              <input
-                className='title'
-                type='text'
-                defaultValue='Reply to emails'
-              />
-              <div className='time'>
-                0 <FiWatch /> -:--:--
-              </div>
-              <nav className='task-ctrls'>
-                <span className='button'>
-                  <FiTrash2 />
-                </span>
-                <span className='button'>
-                  <FiPlay />
-                </span>
-              </nav>
-            </li>
-          </ul>
-        </section> */}
       </main>
     </>
   )
