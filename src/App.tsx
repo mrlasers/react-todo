@@ -17,16 +17,16 @@ import {
     getDateValue, getProjectTodos, isMatchProjectId, newProject, newTodo, removeTodo,
     replaceProject, replaceTodo, sortByTitle, startTodoTimer, todoCancelTimer, todoStopTimer
 } from './helpers'
-import { ID, Todo } from './types'
+import { ID, Project, Todo } from './types'
 
 Modal.setAppElement("#root")
 
-export type Project = {
-  id: string
-  title: string
-  description: string
-  dueDate: string | null
-}
+// export type Project = {
+//   id: string
+//   title: string
+//   description: string
+//   dueDate: string | null
+// }
 
 //-- components
 
@@ -248,9 +248,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           />
           <nav>
             <DueDatePicker
-              value={project.dueDate}
+              value={
+                project.dueDate ? format(project.dueDate, "YYYY-MM-dd") : null
+              }
               onChange={flow(
-                (dueDate) => ({ ...project, dueDate }),
+                (dueDate) => ({ ...project, dueDate: new Date(dueDate) }),
                 msgUpdateProject,
                 dispatch,
               )}
