@@ -8,7 +8,7 @@
   --fg-color: var(--light-color);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
     --bg-color: var(--light-color);
     --fg-color: var(--dark-color);
@@ -21,39 +21,9 @@
   padding: 1rem 2rem;
 }
 
-// #root {
-//   --brand-color: orangered;
-//   --pop-color: yellowgreen;
-//   --dark-color: rgb(36, 36, 36);
-//   --light-color: rgb(244, 244, 244);
-//   --dark-color: purple;
-//   --light-color: aquamarine;
-//   --bg-color: var(--light-color);
-//   --fg-color: var(--dark-color);
-
-//   max-width: 1280px;
-//   width: clamp(320px, 70%, 600px);
-//   min-height: 100vh;
-//   margin: 0 auto;
-//   padding: 1rem 2rem;
-//   text-align: center;
-
-//   color: var(--fg-color);
-//   // background-color: var(--dark-color);
-// }
-
-// @media (prefers-color-scheme: dark) {
-//   :root {
-//     --light-color: black;
-//     --dark-color: white;
-//   }
-//   a:hover {
-//     color: #747bff;
-//   }
-//   // button {
-//   //   background-color: #f9f9f9;
-//   // }
-// }
+* {
+  scrollbar-gutter: stable both-edges;
+}
 
 body {
   margin: 0;
@@ -70,11 +40,8 @@ body * {
 header {
   background-color: var(--brand-color);
   color: var(--light-color);
-  // color: var(--light-color);
-  // padding: 1.65rem 1rem;
 
   nav {
-    // background-color: darkslategray;
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -132,14 +99,10 @@ header {
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    // padding: 0.25rem 1rem;
 
     .project-title {
-      // background-color: var(--bg-color);
-      // color: var(--fg-color);
       border: 0;
       font-size: 1.5em;
-      // width: 100%;
       flex-grow: 1;
       border-radius: 0.25em;
       padding: 0.25rem;
@@ -152,9 +115,6 @@ header {
     nav {
       display: flex;
       flex-direction: row;
-      // align-items: stretch;
-
-      // background-color: coral;
 
       & > button {
         display: inline-block;
@@ -208,23 +168,6 @@ header {
         }
       }
     }
-
-    // button {
-    //   // display: none;
-    //   // display: flex;
-    //   padding: 0.5em;
-    //   // border: 0;
-    //   // opacity: 0;
-    //   height: 100%;
-    //   // aspect-ratio: 1 / 1;
-    //   cursor: pointer;
-
-    //   transition: opacity 250ms;
-
-    //   // & > * {
-    //   //   height: 100%;
-    //   // }
-    // }
   }
 
   .description {
@@ -245,7 +188,6 @@ header {
 }
 
 .task-list {
-  // padding: 1rem;
   padding-top: 0.5rem;
 
   ul {
@@ -260,7 +202,6 @@ header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      // background-color: aqua;
       display: grid;
       grid-template-columns: 5fr 2fr 1fr;
       grid-template-areas: 'title time controls';
@@ -273,7 +214,6 @@ header {
       }
 
       &.active {
-        // outline: 5px solid yellowgreen;
         background-color: var(--pop-color);
         border-radius: 1rem;
         color: darkslateblue;
@@ -286,9 +226,7 @@ header {
   }
 
   .title {
-    // width: 50%;
     grid-area: title;
-    // background-color: rgba(0 0 0 / 0.15);
     text-align: left;
     margin: 0;
     padding: 0.25em;
@@ -311,9 +249,6 @@ header {
     grid-area: time;
 
     font-family: 'Courier New', Courier, monospace;
-
-    // width: 25%;
-    // background-color: rgba(0 0 0 / 0.35);
   }
 
   .task-ctrls {
@@ -338,29 +273,9 @@ header {
   }
 }
 
-// .button {
-//   display: flex;
-//   place-content: center;
-//   font-size: 1.25em;
-//   background-color: lightgrey;
-//   aspect-ratio: 1/1;
-//   padding: 0.3em;
-//   border-radius: 0.4em;
-//   cursor: pointer;
-
-//   &.round {
-//     border-radius: 100vw;
-//   }
-
-//   &:hover {
-//     background-color: grey;
-//     color: white;
-//   }
-// }
-
 /* TODO-CARD */
 .todo-card {
-  background-color: coral;
+  // background-color: coral;
   padding: 1rem;
   display: flex;
   justify-content: space-between;
@@ -370,4 +285,58 @@ header {
     aspect-ratio: 1 / 1;
     border-radius: 0.5em;
   }
+}
+
+.Modal {
+  max-width: clamp(100vw, 50%, 40ch);
+  background-color: var(--bg-color);
+  padding: 1rem;
+  border-radius: 0.35em;
+  box-shadow: 3px 3px 5px rgba(0 0 0 / 0.25);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+
+  h2 {
+    margin: 0;
+    font-size: 1.3em;
+  }
+
+  .buttons {
+    margin-inline: auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+.soft-button {
+  border: 0;
+  background-color: lightgrey;
+  padding: 0.5em;
+  border-radius: 0.5em;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--pop-color);
+    color: var(--bg-color);
+  }
+
+  &:active {
+    background-color: var(--brand-color);
+    color: var(--bg-color);
+  }
+}
+
+.Overlay {
+  display: grid;
+  place-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0 0 0 / 0.5);
 }

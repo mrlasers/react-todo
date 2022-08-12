@@ -2,29 +2,42 @@
 import './App.scss'
 
 import { differenceInDays, format } from 'date-fns'
-import { nanoid } from 'nanoid'
+import { guard } from 'fp-ts-std/Function'
+import * as A from 'fp-ts/Array'
+import { flow, pipe } from 'fp-ts/lib/function'
+import * as O from 'fp-ts/Option'
 import {
-    ButtonHTMLAttributes, InputHTMLAttributes, useEffect, useReducer, useRef, useState
+  ButtonHTMLAttributes,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
 } from 'react'
-import {
-    FiClock, FiDelete, FiMenu, FiPause, FiPlay, FiPlus, FiPlusCircle, FiTrash2, FiWatch, FiX
-} from 'react-icons/fi'
+import { FiClock, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi'
+import Modal from 'react-modal'
 
-import { getRandomName } from './helpers'
+import {
+  getDateValue,
+  getProjectTodos,
+  isMatchProjectId,
+  newProject,
+  newTodo,
+  removeTodo,
+  replaceProject,
+  replaceTodo,
+  sortByTitle,
+  startTodoTimer,
+  todoCancelTimer,
+  todoStopTimer,
+} from './helpers'
+
+Modal.setAppElement('#root')
 
 export type Project = {
   id: string
   title: string
   description: string
   dueDate: string | null
-}
-
-export type ProjectKeys = keyof Exclude<Project, 'id'>
-
-export type Todo = {
-  id: string
-  title: string
-  projectId: string
 }
 
 //-- components
@@ -34,11 +47,40 @@ export type CustomOnChange<T> = {
 }
 
 export type WithDispatch = {
-  dispatch: React.Dispatch<Action>
+  dispatch: React.Dispatch<Msg>
 }
 
-export const TodoCard: React.FC<CustomOnChange<Todo> & { todo: Todo }> = ({
+//-- TODO
+
+export type Todo = {
+  id: string
+  title: string
+  projectId: string
+  taskTime: {
+    start: Date
+    end: Date
+    duration: number
+  }[]
+  lastWorked?: Date
+  totalDuration: number
+  taskStartTime?: Date
+}
+
+export type TodoCardProps = {
+  onDelete?: (todo: Todo) => void
+  onTimerStart?: (id: ID) => void
+  onTimerStop?: (id: ID) => void
+  onTimerCancel?: (id: ID) => void
+}
+
+export const TodoCard: React.FC<
+  CustomOnChange<Todo> & TodoCardProps & { todo: Todo }
+> = ({
   onChange,
+  onDelete,
+  onTimerStart,
+  onTimerStop,
+  onTimerCancel,
   todo,
 }) => {
   return (
@@ -48,9 +90,25 @@ export const TodoCard: React.FC<CustomOnChange<Todo> & { todo: Todo }> = ({
         value={todo.title}
         onChange={(title) => onChange && onChange({ ...todo, title })}
       />
-      <button>
-        <FiPlay />
-      </button>
+      <div>
+        <button onClick={() => onDelete?.(todo)}>
+          <FiTrash2 />
+        </button>
+        {todo.taskStartTime && (
+          <button onClick={() => onTimerCancel?.(todo.id)}>
+            <FiX />
+          </button>
+        )}
+        <button
+          onClick={() =>
+            todo.taskStartTime
+              ? onTimerStop?.(todo.id)
+              : onTimerStart?.(todo.id)
+          }
+        >
+          {todo.taskStartTime ? <FiSquare /> : <FiPlay />}
+        </button>
+      </div>
     </div>
   )
 }
@@ -61,42 +119,48 @@ export const DueDatePicker: React.FC<
 > = (props) => {
   const { children, onChange, value, ...attrs } = props
 
-  const daysLeft = !value
-    ? null
-    : differenceInDays(new Date(value), new Date(getDateValue()))
+  // might want to combine maybeDaysLeft and buttonClassName into one pipe
+  // but leaving here for now because i might also want the number of days left
+  const maybeDaysLeft = pipe(
+    O.fromNullable(value),
+    O.map((date) => differenceInDays(new Date(date), new Date(getDateValue())))
+  )
+
+  const buttonClassName = pipe(
+    maybeDaysLeft,
+    O.map(
+      guard<number, string>([
+        [(n) => n <= 1, () => 'warn'],
+        [(n) => n <= 7, () => 'chill'],
+      ])(() => '')
+    ),
+    O.getOrElse(() => '')
+  )
+
+  const buttonStyle: React.CSSProperties = { position: 'relative' }
+
+  const inputStyle: React.CSSProperties = {
+    opacity: 0,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 9999999,
+  }
 
   return (
-    <button
-      {...attrs}
-      className={
-        !daysLeft ? '' : daysLeft <= 1 ? 'warn' : daysLeft <= 7 ? 'chill' : ''
-      }
-      style={{ position: 'relative' }}>
+    <button {...attrs} className={buttonClassName} style={buttonStyle}>
       <input
         required
         value={value ?? ''}
         type='date'
-        onChange={(e) => {
-          onChange && onChange(e.target.value)
-        }}
-        onClick={(e) => {
-          console.log('click')
-        }}
-        style={{
-          opacity: 0,
-          // border: 0,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100%',
-          height: '100%',
-          zIndex: 9999999,
-        }}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={inputStyle}
       />
       <FiClock /> <span>{value && format(new Date(value), 'MMM d')}</span>
-      {/* {children} */}
     </button>
   )
 }
@@ -142,7 +206,7 @@ export const TextInput: React.FC<
 export type ProjectCardProps = {
   project: Project
   todos: Todo[]
-  dispatch: React.Dispatch<Action>
+  dispatch: React.Dispatch<Msg>
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({
@@ -150,15 +214,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   todos,
   dispatch,
 }) => {
-  const inputEl = useRef<HTMLInputElement>(null)
   const textareaEl = useRef<HTMLTextAreaElement>(null)
   const [isCtrlsActive, setIsCtrlsActive] = useState(false)
   const [title, setTitle] = useState(project.title)
   const [description, setDescription] = useState(project.description)
 
-  // function handleChangeTitle(newTitle: string) {
-  //   setTitle(newTitle)
-  // }
   function handleChangeDescription(newDescription: string) {
     setDescription(newDescription)
   }
@@ -179,239 +239,329 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     })
   }
 
-  const [showDatePicker, setShowDatePicker] = useState(false)
-
   useEffect(() => {
     setTitle(project.title)
     setDescription(project.description)
   }, [project])
 
-  return project === null ? null : (
-    <div className='project-card'>
-      <div className={'header' + (isCtrlsActive ? ' active' : '')}>
-        <TextInput
-          type='text'
-          className='project-title'
-          value={title}
-          onBlur={handleOnChange}
-          onChange={(title) => {
-            return dispatch({
-              type: 'UPDATE_PROJECT',
-              payload: { ...project, title: title },
-            })
-          }}
-        />
-        <nav>
-          <DueDatePicker
-            value={project.dueDate}
-            onChange={(date) =>
-              dispatch({
+  return (
+    project && (
+      <div className='project-card'>
+        <div className={'header' + (isCtrlsActive ? ' active' : '')}>
+          <TextInput
+            type='text'
+            className='project-title'
+            value={title}
+            onBlur={handleOnChange}
+            onChange={(title) => {
+              return dispatch({
                 type: 'UPDATE_PROJECT',
-                payload: {
-                  ...project,
-                  dueDate: date,
-                },
+                payload: { ...project, title: title },
               })
-            }>
-            <FiClock />
-          </DueDatePicker>
-          <button
-            title='Delete?'
-            onClick={() => {
-              console.log('deleting', project.id)
-              dispatch({ type: 'DELETE_PROJECT', payload: project })
-            }}>
-            <FiTrash2 />
-          </button>
-        </nav>
-      </div>
-      <div className='description'>
-        <textarea
-          ref={textareaEl}
-          spellCheck={false}
-          placeholder='Enter description, notes, etc., here...'
-          value={description}
-          onBlur={handleOnChange}
-          onKeyDown={(e) =>
-            e.key === 'Escape' &&
-            textareaEl.current &&
-            textareaEl.current.blur()
-          }
-          onInput={(e) =>
-            handleChangeDescription(e.currentTarget.value)
-          }></textarea>
-      </div>
-      <div className='todos-list'>
-        <h3>Todos</h3>
-        <nav>
-          <button
-            onClick={() => dispatch({ type: 'ADD_TODO', payload: project })}>
-            Add Task
-          </button>
-        </nav>
-        {todos.map((todo) => (
-          <TodoCard
-            todo={todo}
-            onChange={(newTodo) =>
-              dispatch({
-                type: 'UPDATE_TODO',
-                payload: newTodo,
-              })
-            }
+            }}
           />
-        ))}
+          <nav>
+            <DueDatePicker
+              value={project.dueDate}
+              onChange={flow(
+                (dueDate) => ({ ...project, dueDate }),
+                msgUpdateProject,
+                dispatch
+              )}
+            >
+              <FiClock />
+            </DueDatePicker>
+            <button
+              title='Delete?'
+              onClick={flow(() => msgDeleteProject(project), dispatch)}
+            >
+              <FiTrash2 />
+            </button>
+          </nav>
+        </div>
+        <div className='description'>
+          <textarea
+            ref={textareaEl}
+            spellCheck={false}
+            placeholder='Enter description, notes, etc., here...'
+            value={description}
+            onBlur={handleOnChange}
+            onKeyDown={(e) =>
+              e.key === 'Escape' &&
+              textareaEl.current &&
+              textareaEl.current.blur()
+            }
+            onInput={(e) => handleChangeDescription(e.currentTarget.value)}
+          ></textarea>
+        </div>
+        <div className='todos-list'>
+          <h3>Todos</h3>
+          <nav>
+            <button onClick={flow(() => msgAddTodo(project), dispatch)}>
+              Add Task
+            </button>
+          </nav>
+          {todos.map((todo) => (
+            <TodoCard
+              key={todo.id}
+              todo={todo}
+              onChange={flow(msgUpdateTodo, dispatch)}
+              onTimerStart={flow(msgTodoTimerStart, dispatch)}
+              onTimerStop={flow(msgTodoTimerStop, dispatch)}
+              onTimerCancel={flow(msgTodoTimerCancel, dispatch)}
+              onDelete={flow(() => msgDeleteTodo(todo), dispatch)}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    )
   )
-}
-
-//-- little helper functions
-
-export const sortByTitle = (a: Project, b: Project) =>
-  a.title > b.title ? 1 : -1
-
-export const getDateValue = (date?: Date) => {
-  const now = date ?? new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  const day = now.getDate()
-
-  return `${year}-${month}-${day}`
 }
 
 //-- state reducer and stuff
 
-export type State = {
+export type Model = {
   projects: Project[]
   todos: Todo[]
   selectedProject: Project | null
+  deleteOp?: RemoveMsg
 }
 
-export type Action =
-  | { type: 'UPDATE_PROJECT'; payload: Project }
-  | { type: 'DELETE_PROJECT'; payload: Project }
-  | { type: 'ADD_NEW_PROJECT' }
-  | { type: 'SELECT_PROJECT'; payload: Project | string }
-  | { type: 'ADD_TODO'; payload: Project }
-  | { type: 'UPDATE_TODO'; payload: Todo }
+export type ID = string
 
-export function stateReducer(state: State, action: Action): State {
-  switch (action.type) {
+export type TODO_TIMER_START = msg<'TODO_TIMER_START', ID>
+export type TODO_TIMER_STOP = msg<'TODO_TIMER_STOP', ID>
+export type TODO_TIMER_CANCEL = msg<'TODO_TIMER_CANCEL', ID>
+
+export type TodoMsg = TODO_TIMER_START | TODO_TIMER_STOP | TODO_TIMER_CANCEL
+
+export type RemoveMsgProject = { type: 'REMOVE_PROJECT'; payload: Project }
+export type RemoveMsgTodo = { type: 'REMOVE_TODO'; payload: Todo }
+
+export type RemoveMsg = RemoveMsgProject | RemoveMsgTodo
+
+export type msg<T extends string, P extends any> = { type: T; payload: P }
+
+export type ADD_NEW_PROJECT = msg<'ADD_NEW_PROJECT', undefined>
+export type UPDATE_PROJECT = msg<'UPDATE_PROJECT', Project>
+export type REMOVE_PROJECT = msg<'REMOVE_PROJECT', Project>
+
+export type SELECT_PROJECT = msg<'SELECT_PROJECT', ID>
+export type DELETE_SOMETHING = msg<'DELETE_SOMETHING', RemoveMsg | undefined>
+
+export type ADD_TODO = msg<'ADD_TODO', Project>
+export type UPDATE_TODO = msg<'UPDATE_TODO', Todo>
+export type REMOVE_TODO = msg<'REMOVE_TODO', Todo>
+
+export type Msg =
+  | UPDATE_PROJECT
+  | DELETE_SOMETHING
+  | ADD_NEW_PROJECT
+  | SELECT_PROJECT
+  | ADD_TODO
+  | UPDATE_TODO
+  | TodoMsg
+  | RemoveMsg
+
+export function msgCreator<T extends Msg>(type: T['type']) {
+  return (payload: T['payload']) => {
+    return { type, payload }
+  }
+}
+
+const msgAddNewProject = () =>
+  msgCreator<ADD_NEW_PROJECT>('ADD_NEW_PROJECT')(undefined)
+const msgUpdateProject = msgCreator<UPDATE_PROJECT>('UPDATE_PROJECT')
+
+const msgTodoTimerStart = msgCreator<TODO_TIMER_START>('TODO_TIMER_START')
+const msgTodoTimerStop = msgCreator<TODO_TIMER_STOP>('TODO_TIMER_STOP')
+const msgTodoTimerCancel = msgCreator<TODO_TIMER_CANCEL>('TODO_TIMER_CANCEL')
+
+const msgSelectProject = msgCreator<SELECT_PROJECT>('SELECT_PROJECT')
+
+const msgAddTodo = msgCreator<ADD_TODO>('ADD_TODO')
+const msgUpdateTodo = msgCreator<UPDATE_TODO>('UPDATE_TODO')
+
+const msgDeleteSomething = <T extends DELETE_SOMETHING>(
+  something?: T['payload']
+) => msgCreator<DELETE_SOMETHING>('DELETE_SOMETHING')(something)
+
+const msgDeleteProject = (project: Project) =>
+  msgCreator<DELETE_SOMETHING>('DELETE_SOMETHING')({
+    type: 'REMOVE_PROJECT',
+    payload: project,
+  })
+const msgDeleteTodo = (todo: Todo) =>
+  msgCreator<DELETE_SOMETHING>('DELETE_SOMETHING')({
+    type: 'REMOVE_TODO',
+    payload: todo,
+  })
+
+export function updateTodo(model: Model, { type, payload }: Msg): Model {
+  switch (type) {
     default:
-      return state
-    case 'UPDATE_PROJECT': {
-      const { projects } = state
-      const { payload: project } = action
+      return model
 
-      const selectedProject =
-        state.selectedProject?.id === project.id
-          ? project
-          : state.selectedProject
-
-      return {
-        ...state,
-        projects: projects.map((thisProject) =>
-          thisProject.id === project.id ? project : thisProject
-        ),
-        selectedProject: selectedProject,
-      }
-    }
-    case 'DELETE_PROJECT': {
-      const projects = state.projects.filter(
-        (proj) => proj.id !== action.payload.id
-      )
-      return {
-        ...state,
-        projects,
-        selectedProject: projects[0] ?? null,
-      }
-    }
-    case 'ADD_NEW_PROJECT': {
-      const newProject: Project = {
-        id: nanoid(),
-        title: getRandomName(),
-        description: '',
-        dueDate: null,
-      }
-
-      return {
-        ...state,
-        projects: [...state.projects, newProject].sort(sortByTitle),
-        selectedProject: newProject,
-      }
-    }
-    case 'SELECT_PROJECT': {
-      const { payload } = action
-      const id = typeof payload === 'string' ? payload : payload.id
-      const selectedProject = state.projects.find(
-        (project) => project.id === id
-      )
-
-      return !selectedProject
-        ? state
-        : {
-            ...state,
-            selectedProject,
-          }
-    }
     case 'ADD_TODO': {
-      const { payload: project } = action
-
       return {
-        ...state,
-        todos: [
-          ...state.todos,
-          {
-            id: nanoid(),
-            title: getRandomName(),
-            projectId: project.id,
-          },
-        ],
+        ...model,
+        todos: [...model.todos, newTodo(payload)],
       }
     }
     case 'UPDATE_TODO': {
-      const { payload: todo } = action
-
       return {
-        ...state,
-        todos: state.todos.map((td) => (td.id === todo.id ? todo : td)),
+        ...model,
+        todos: replaceTodo(model.todos, payload),
+      }
+    }
+    case 'REMOVE_TODO': {
+      return {
+        ...model,
+        todos: removeTodo(model.todos, payload),
+        deleteOp: undefined,
+      }
+    }
+    case 'TODO_TIMER_START': {
+      return {
+        ...model,
+        todos: startTodoTimer(model.todos, payload),
+      }
+    }
+    case 'TODO_TIMER_STOP': {
+      return {
+        ...model,
+        todos: model.todos.map(todoStopTimer),
+      }
+    }
+    case 'TODO_TIMER_CANCEL': {
+      return {
+        ...model,
+        todos: model.todos.map(todoCancelTimer),
       }
     }
   }
 }
 
+export function update(model: Model, msg: Msg): Model {
+  switch (msg.type) {
+    default:
+      return updateTodo(model, msg)
+    case 'DELETE_SOMETHING': {
+      return {
+        ...model,
+        deleteOp: msg.payload,
+      }
+    }
+    case 'UPDATE_PROJECT': {
+      // we're doing the same thing in the map as we're doing to get selectedProject
+      // should probably dry this shit out
+      return {
+        ...model,
+        projects: model.projects.map((thisProject) =>
+          thisProject.id === msg.payload.id ? msg.payload : thisProject
+        ),
+        selectedProject:
+          model.selectedProject?.id === msg.payload.id
+            ? msg.payload
+            : model.selectedProject,
+      }
+    }
+    case 'REMOVE_PROJECT': {
+      return pipe(replaceProject(model.projects, msg.payload), (projects) => ({
+        ...model,
+        projects,
+        todos: model.todos.filter(isMatchProjectId(projects[0]?.id)),
+        selectedProject: projects[0] ?? null,
+        deleteOp: undefined,
+      }))
+    }
+    case 'ADD_NEW_PROJECT': {
+      return pipe(newProject(), (project) => ({
+        ...model,
+        projects: [...model.projects, project].sort(sortByTitle),
+        selectedProject: project,
+      }))
+    }
+    case 'SELECT_PROJECT': {
+      return pipe(
+        O.fromNullable(
+          model.projects.find((project) => project.id === msg.payload)
+        ),
+        O.map((selectedProject) => ({ ...model, selectedProject })),
+        O.getOrElse(() => model)
+      )
+    }
+  }
+}
+
+const DeleteModal: React.FC<{
+  dispatch: React.Dispatch<Msg>
+  deleteMsg: RemoveMsg
+}> = ({ dispatch, deleteMsg: deleteAction }) => {
+  return (
+    <Modal
+      isOpen={!!deleteAction}
+      shouldCloseOnEsc={true}
+      shouldCloseOnOverlayClick={true}
+      onRequestClose={flow(() => msgDeleteSomething(), dispatch)}
+      className='Modal'
+      overlayClassName='Overlay'
+    >
+      <h2>
+        Delete {deleteAction?.type === 'REMOVE_PROJECT' ? 'Project' : 'Todo???'}{' '}
+        <em>{deleteAction?.payload.title}</em>
+      </h2>
+      <div className='buttons'>
+        <button
+          className='soft-button'
+          onClick={flow(() => msgDeleteSomething(), dispatch)}
+        >
+          Cancel
+        </button>
+        <button className='soft-button' onClick={() => dispatch(deleteAction)}>
+          Confirm
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+const initialModel: Model = { projects: [], todos: [], selectedProject: null }
+
 const App = () => {
-  const [state, dispatch] = useReducer<(state: State, action: Action) => State>(
-    stateReducer,
-    { projects: [], todos: [], selectedProject: null }
+  const [model, dispatch] = useReducer<(model: Model, msg: Msg) => Model>(
+    update,
+    initialModel
   )
 
-  const { projects, selectedProject } = state
-
-  // useEffect(() => {
-  //   console.log('rerendering app')
-  // }, [state])
+  const { projects, selectedProject } = model
 
   return (
     <>
+      {model.deleteOp && (
+        <DeleteModal dispatch={dispatch} deleteMsg={model.deleteOp} />
+      )}
       <header>
         <nav>
           <h1>Project Tracker</h1>
           <div className='project-controls'>
-            {projects.length ? (
+            {!!projects.length && (
               <select
                 value={selectedProject?.id}
-                onChange={(e) =>
-                  dispatch({ type: 'SELECT_PROJECT', payload: e.target.value })
-                }>
+                onChange={flow(
+                  ({ target }) => target.value,
+                  msgSelectProject,
+                  dispatch
+                )}
+              >
                 {projects.map((proj) => (
                   <option key={proj.id} value={proj.id}>
                     {proj.title}
                   </option>
                 ))}
               </select>
-            ) : null}
-            <button onClick={() => dispatch({ type: 'ADD_NEW_PROJECT' })}>
+            )}
+            <button onClick={flow(msgAddNewProject, dispatch)}>
               New Project
             </button>
           </div>
@@ -421,96 +571,14 @@ const App = () => {
         {selectedProject && (
           <ProjectCard
             project={selectedProject}
-            todos={state.todos.filter(
-              (td) => td.projectId === selectedProject.id
-            )}
+            todos={getProjectTodos(model.todos, selectedProject.id)}
             dispatch={dispatch}
           />
         )}
 
         <code>
-          <pre>{JSON.stringify(state.todos, null, 2)}</pre>
+          <pre>{JSON.stringify(model.todos, null, 2)}</pre>
         </code>
-
-        {/* <hr />
-        <section className='project-card'>
-          <div className='header'>
-            <div>
-              <input
-                type='text'
-                className='project-title'
-                value='Project Title'
-              />
-            </div>
-            <div className='button'>
-              <FiMenu />
-            </div>
-          </div>
-          <div className='description'>
-            <textarea spellCheck={false}>
-              Lorem ipsum dolor sit amet consectetur, adipisicing elit.
-              Perferendis dolores laborum illo fuga, suscipit ut in! Ea possimus
-              nesciunt fugit incidunt quae eum iste. Reprehenderit esse
-              consequatur, porro deserunt fugiat omnis corporis? Exercitationem,
-              deleniti? Excepturi, recusandae. Repellendus porro possimus vitae
-              vero iure nulla provident nam?
-            </textarea>
-          </div>
-        </section>
-        <section className='task-list'>
-          <ul>
-            <li className='active'>
-              <input
-                className='title'
-                type='text'
-                defaultValue='Work on some todo app'
-              />
-              <div className='time'>
-                3 <FiWatch /> 0:15:32
-              </div>
-              <nav className='task-ctrls'>
-                <span className='button'>
-                  <FiX />
-                </span>
-                <span className='button'>
-                  <FiPause />
-                </span>
-              </nav>
-            </li>
-            <li className='new-task'>
-              <input type='text' className='title' />
-              <nav className='task-ctrls'>
-                <span className='button' title='Add task'>
-                  <FiPlus />
-                </span>
-                <span
-                  className='button'
-                  title='Add task and start time tracking'
-                >
-                  <FiPlay />
-                </span>
-              </nav>
-            </li>
-            <li>
-              <input
-                className='title'
-                type='text'
-                defaultValue='Reply to emails'
-              />
-              <div className='time'>
-                0 <FiWatch /> -:--:--
-              </div>
-              <nav className='task-ctrls'>
-                <span className='button'>
-                  <FiTrash2 />
-                </span>
-                <span className='button'>
-                  <FiPlay />
-                </span>
-              </nav>
-            </li>
-          </ul>
-        </section> */}
       </main>
     </>
   )
