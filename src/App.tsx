@@ -6,29 +6,13 @@ import { guard } from 'fp-ts-std/Function'
 import * as A from 'fp-ts/Array'
 import { flow, pipe } from 'fp-ts/lib/function'
 import * as O from 'fp-ts/Option'
-import {
-  ButtonHTMLAttributes,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-} from 'react'
+import { ButtonHTMLAttributes, useEffect, useReducer, useRef, useState } from 'react'
 import { FiClock, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi'
 import Modal from 'react-modal'
 
 import {
-  getDateValue,
-  getProjectTodos,
-  isMatchProjectId,
-  newProject,
-  newTodo,
-  removeTodo,
-  replaceProject,
-  replaceTodo,
-  sortByTitle,
-  startTodoTimer,
-  todoCancelTimer,
-  todoStopTimer,
+    getDateValue, getProjectTodos, isMatchProjectId, newProject, newTodo, removeTodo,
+    replaceProject, replaceTodo, sortByTitle, startTodoTimer, todoCancelTimer, todoStopTimer
 } from './helpers'
 
 Modal.setAppElement('#root')
@@ -104,8 +88,7 @@ export const TodoCard: React.FC<
             todo.taskStartTime
               ? onTimerStop?.(todo.id)
               : onTimerStart?.(todo.id)
-          }
-        >
+          }>
           {todo.taskStartTime ? <FiSquare /> : <FiPlay />}
         </button>
       </div>
@@ -267,14 +250,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 (dueDate) => ({ ...project, dueDate }),
                 msgUpdateProject,
                 dispatch
-              )}
-            >
+              )}>
               <FiClock />
             </DueDatePicker>
             <button
               title='Delete?'
-              onClick={flow(() => msgDeleteProject(project), dispatch)}
-            >
+              onClick={flow(() => msgDeleteProject(project), dispatch)}>
               <FiTrash2 />
             </button>
           </nav>
@@ -291,8 +272,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               textareaEl.current &&
               textareaEl.current.blur()
             }
-            onInput={(e) => handleChangeDescription(e.currentTarget.value)}
-          ></textarea>
+            onInput={(e) =>
+              handleChangeDescription(e.currentTarget.value)
+            }></textarea>
         </div>
         <div className='todos-list'>
           <h3>Todos</h3>
@@ -505,8 +487,7 @@ const DeleteModal: React.FC<{
       shouldCloseOnOverlayClick={true}
       onRequestClose={flow(() => msgDeleteSomething(), dispatch)}
       className='Modal'
-      overlayClassName='Overlay'
-    >
+      overlayClassName='Overlay'>
       <h2>
         Delete {deleteAction?.type === 'REMOVE_PROJECT' ? 'Project' : 'Todo???'}{' '}
         <em>{deleteAction?.payload.title}</em>
@@ -514,8 +495,7 @@ const DeleteModal: React.FC<{
       <div className='buttons'>
         <button
           className='soft-button'
-          onClick={flow(() => msgDeleteSomething(), dispatch)}
-        >
+          onClick={flow(() => msgDeleteSomething(), dispatch)}>
           Cancel
         </button>
         <button className='soft-button' onClick={() => dispatch(deleteAction)}>
@@ -552,8 +532,7 @@ const App = () => {
                   ({ target }) => target.value,
                   msgSelectProject,
                   dispatch
-                )}
-              >
+                )}>
                 {projects.map((proj) => (
                   <option key={proj.id} value={proj.id}>
                     {proj.title}
