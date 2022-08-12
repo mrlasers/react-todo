@@ -177,14 +177,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         description: description ?? project.description,
       },
     })
-
-    // const newProject = {
-    //   ...project,
-    //   title: title ?? project.title,
-    //   description: description ?? project.title,
-    // }
-
-    // onChange(newProject)
   }
 
   const [showDatePicker, setShowDatePicker] = useState(false)
