@@ -16,7 +16,7 @@ export function removeTodo(todos: Todo[], todo: Todo): Todo[] {
 
 export function replaceProject(
   projects: Project[],
-  project: Project
+  project: Project,
 ): Project[] {
   return projects.filter((proj) => proj.id !== project.id)
 }
@@ -34,9 +34,9 @@ export function startTodoTimer(todos: Todo[], id: ID): Todo[] {
                 ...todo,
                 taskStartTime: new Date(),
               },
-        identity
-      )
-    )
+        identity,
+      ),
+    ),
   )
 }
 
@@ -44,7 +44,7 @@ export function newProject(): Project {
   return {
     id: nanoid(),
     title: getRandomName(),
-    description: '',
+    description: "",
     dueDate: null,
   }
 }

@@ -1,4 +1,47 @@
-import { Project, Todo } from './'
+import { PersistantModel, Project, Todo } from './'
+
+describe("State", () => {
+  it("does an empty State", () => {
+    const input = {
+      projects: [],
+      todos: [],
+    }
+
+    const encoded = {
+      projects: [],
+      todos: [],
+    }
+
+    const decoded = {
+      projects: [],
+      todos: [],
+    }
+
+    expect(State.decode(input)).toEqualRight(decoded)
+    expect(State.encode(decoded)).toMatchObject(encoded)
+  })
+
+  it("does an empty Model with deleteOp", () => {
+    const input = {
+      projects: [],
+      todos: [],
+      deleteOp: { doesIt: "matter?" },
+    }
+
+    const encoded = {
+      projects: [],
+      todos: [],
+    }
+
+    const decoded = {
+      projects: [],
+      todos: [],
+    }
+
+    expect(State.decode(input)).toEqualRight(decoded)
+    expect(State.encode(decoded)).toMatchObject(encoded)
+  })
+})
 
 describe("Project", () => {
   it("decodes/encodes a complete project", () => {

@@ -4,6 +4,7 @@ import './App.scss'
 import { differenceInDays, format } from 'date-fns'
 import { guard } from 'fp-ts-std/Function'
 import * as A from 'fp-ts/Array'
+import * as E from 'fp-ts/Either'
 import { flow, pipe } from 'fp-ts/lib/function'
 import * as O from 'fp-ts/Option'
 //-- TODO
@@ -17,7 +18,7 @@ import {
     getDateValue, getProjectTodos, isMatchProjectId, newProject, newTodo, removeTodo,
     replaceProject, replaceTodo, sortByTitle, startTodoTimer, todoCancelTimer, todoStopTimer
 } from './helpers'
-import { ID, Project, Todo } from './types'
+import { ID, Model, PersistantModel, Project, Todo } from './types'
 
 Modal.setAppElement("#root")
 
@@ -249,7 +250,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <nav>
             <DueDatePicker
               value={
-                project.dueDate ? format(project.dueDate, "YYYY-MM-dd") : null
+                project.dueDate ? format(project.dueDate, "yyyy-MM-dd") : null
               }
               onChange={flow(
                 (dueDate) => ({ ...project, dueDate: new Date(dueDate) }),
@@ -306,14 +307,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   )
 }
 
-//-- state reducer and stuff
-
-export type Model = {
-  projects: Project[]
-  todos: Todo[]
-  selectedProject: Project | null
-  deleteOp?: RemoveMsg
-}
+// export type Model = {
+//   projects: Project[]
+//   todos: Todo[]
+//   selectedProject: Project | null
+//   deleteOp?: RemoveMsg
+// }
 
 export type TODO_TIMER_START = msg<"TODO_TIMER_START", ID>
 export type TODO_TIMER_STOP = msg<"TODO_TIMER_STOP", ID>
@@ -512,13 +511,42 @@ const DeleteModal: React.FC<{
   )
 }
 
-const initialModel: Model = { projects: [], todos: [], selectedProject: null }
+const initialModel: Model = pipe(
+  localStorage.getItem("saved-model"),
+  O.fromNullable,
+  O.chain((json) => O.tryCatch(() => JSON.parse(json))),
+  O.chain(
+    flow(
+      PersistantModel.decode,
+      E.fold((error) => {
+        console.log(D.draw(error))
+        return O.none
+      }, O.of),
+    ),
+  ),
+  O.fold<Model, Model>(
+    () => ({ projects: [], todos: [], selectedProject: undefined }),
+    (model) => ({
+      ...model,
+      todos: model.todos.filter((todo) =>
+        model.projects.find((project) => project.id === todo.projectId),
+      ),
+    }),
+  ),
+)
 
 const App = () => {
   const [model, dispatch] = useReducer<(model: Model, msg: Msg) => Model>(
     update,
     initialModel,
   )
+
+  useEffect(() => {
+    localStorage.setItem(
+      "saved-model",
+      JSON.stringify(PersistantModel.encode(model)),
+    )
+  }, [model])
 
   const { projects, selectedProject } = model
 

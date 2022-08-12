@@ -3,6 +3,8 @@ import { flow, pipe } from 'fp-ts/lib/function'
 import * as C from 'io-ts/Codec'
 import * as D from 'io-ts/Decoder'
 
+import { RemoveMsg } from '../App'
+
 export const ID = C.make(
   pipe(
     D.string,
@@ -61,8 +63,7 @@ export const Todo = pipe(
     id: ID,
     projectId: ID,
     title: C.string,
-    description: C.string,
-    taskTime: TaskTime,
+    taskTime: C.array(TaskTime),
     totalDuration: C.number,
   }),
   C.intersect(
@@ -81,7 +82,19 @@ export const Project = pipe(
   }),
   C.intersect(
     C.partial({
-      dueDate: DateCodec,
+      dueDate: C.nullable(DateCodec),
+    }),
+  ),
+)
+
+export const PersistantModel = pipe(
+  C.struct({
+    projects: C.array(Project),
+    todos: C.array(Todo),
+  }),
+  C.intersect(
+    C.partial({
+      selectedProject: C.nullable(Project),
     }),
   ),
 )
@@ -89,3 +102,8 @@ export const Project = pipe(
 export type ID = C.TypeOf<typeof ID>
 export type Todo = C.TypeOf<typeof Todo>
 export type Project = C.TypeOf<typeof Project>
+export type State = C.TypeOf<typeof PersistantModel>
+
+export type Model = State & {
+  deleteOp?: RemoveMsg
+}
