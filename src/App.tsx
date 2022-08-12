@@ -10,13 +10,29 @@ import * as O from 'fp-ts/Option'
 //-- TODO
 import * as C from 'io-ts/Codec'
 import * as D from 'io-ts/Decoder'
-import { ButtonHTMLAttributes, useEffect, useReducer, useRef, useState } from 'react'
+import {
+  ButtonHTMLAttributes,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { FiClock, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi'
 import Modal from 'react-modal'
 
 import {
-    getDateValue, getProjectTodos, isMatchProjectId, newProject, newTodo, removeTodo,
-    replaceProject, replaceTodo, sortByTitle, startTodoTimer, todoCancelTimer, todoStopTimer
+  getDateValue,
+  getProjectTodos,
+  isMatchProjectId,
+  newProject,
+  newTodo,
+  removeTodo,
+  replaceProject,
+  replaceTodo,
+  sortByTitle,
+  startTodoTimer,
+  todoCancelTimer,
+  todoStopTimer,
 } from './helpers'
 import { ID, Model, PersistantModel, Project, Todo } from './types'
 
