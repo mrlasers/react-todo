@@ -3,7 +3,7 @@ import * as E from 'fp-ts/Either'
 import { flow, identity } from 'fp-ts/lib/function'
 import { nanoid } from 'nanoid'
 
-import { ID, Model, Project, Todo } from '../App'
+import { ID, Model, Project, Todo } from '../types'
 import { getRandomName } from './'
 
 export function replaceTodo(todos: Todo[], todo: Todo): Todo[] {

@@ -1,6 +1,24 @@
-import { PersistantModel, Project, Todo } from './'
+import * as Dt from 'fp-ts/Date'
+import * as O from 'fp-ts/Option'
 
-describe("State", () => {
+import { maybeDate, PersistantModel, Project, Todo } from './'
+
+it("matches a date", () => {
+  const date = new Date()
+  const { equals } = O.getEq(Dt.Eq)
+  expect(equals(O.of(date), O.of(date))).toBe(true)
+
+  expect(equals(O.of(date), O.none)).toBe(false)
+})
+
+describe("MaybeDate", () => {
+  it("decodes a date", () => {
+    const date = new Date("1981-10-12")
+    expect(maybeDate.decode(date)).toEqualRight(O.of(date))
+  })
+})
+
+describe("MandatoryModel", () => {
   it("does an empty State", () => {
     const input = {
       projects: [],
@@ -17,8 +35,8 @@ describe("State", () => {
       todos: [],
     }
 
-    expect(State.decode(input)).toEqualRight(decoded)
-    expect(State.encode(decoded)).toMatchObject(encoded)
+    expect(PersistantModel.decode(input)).toEqualRight(decoded)
+    expect(PersistantModel.encode(decoded)).toMatchObject(encoded)
   })
 
   it("does an empty Model with deleteOp", () => {
@@ -38,8 +56,8 @@ describe("State", () => {
       todos: [],
     }
 
-    expect(State.decode(input)).toEqualRight(decoded)
-    expect(State.encode(decoded)).toMatchObject(encoded)
+    expect(PersistantModel.decode(input)).toEqualRight(decoded)
+    expect(PersistantModel.encode(decoded)).toMatchObject(encoded)
   })
 })
 
@@ -80,17 +98,36 @@ describe("Project", () => {
 })
 
 describe("Todo", () => {
+  // it("decodes a minimal Todo", () => {
+  //   const minimalTodoJson = {
+  //     id: "TODO_XR8_Z5jdHi6B-myT",
+  //     projectId: "PROJECT_abcdefghijklm",
+  //     title: "",
+  //   }
+
+  //   const expected: Todo = {
+  //     id: "TODO_XR8_Z5jdHi6B-myT",
+  //     projectId: "PROJECT_abcdefghijklm",
+  //     title: "",
+  //     taskTime: [],
+  //     totalDuration: 0,
+  //   }
+
+  //   expect(Todo.decode(minimalTodoJson)).toEqualRight(expected)
+  // })
+
   it("decodes a complete Todo", () => {
     const encoded = {
       id: "V1StGXR8_Z5jdHi6B-myT",
       projectId: "V1StGXR8_Z5jdHi6B-myT",
       title: "Hello, World!",
-      description: "He was a dark and stormy knight...",
-      taskTime: {
-        start: "1981-10-12T00:00:00.000Z",
-        end: "1981-10-12T00:01:00.000Z",
-        duration: 60000,
-      },
+      taskTime: [
+        {
+          start: "1981-10-12T00:00:00.000Z",
+          end: "1981-10-12T00:01:00.000Z",
+          duration: 60000,
+        },
+      ],
       lastWorked: "1981-10-12T00:00:00.000Z",
       totalDuration: 60000,
       taskStartTime: "2021-10-12T00:00:00.000Z",
@@ -99,12 +136,13 @@ describe("Todo", () => {
       id: "V1StGXR8_Z5jdHi6B-myT",
       projectId: "V1StGXR8_Z5jdHi6B-myT",
       title: "Hello, World!",
-      description: "He was a dark and stormy knight...",
-      taskTime: {
-        start: new Date("1981-10-12T00:00:00.000Z"),
-        end: new Date("1981-10-12T00:01:00.000Z"),
-        duration: 60000,
-      },
+      taskTime: [
+        {
+          start: new Date("1981-10-12T00:00:00.000Z"),
+          end: new Date("1981-10-12T00:01:00.000Z"),
+          duration: 60000,
+        },
+      ],
       lastWorked: new Date("1981-10-12T00:00:00.000Z"),
       totalDuration: 60000,
       taskStartTime: new Date("2021-10-12T00:00:00.000Z"),
@@ -119,12 +157,13 @@ describe("Todo", () => {
       id: "V1StGXR8_Z5jdHi6B-myT",
       projectId: "V1StGXR8_Z5jdHi6B-myT",
       title: "Hello, World!",
-      description: "He was a dark and stormy knight...",
-      taskTime: {
-        start: "1981-10-12T00:00:00.000Z",
-        end: "1981-10-12T00:01:00.000Z",
-        duration: 60000,
-      },
+      taskTime: [
+        {
+          start: "1981-10-12T00:00:00.000Z",
+          end: "1981-10-12T00:01:00.000Z",
+          duration: 60000,
+        },
+      ],
       lastWorked: "1981-10-12T00:00:00.000Z",
       totalDuration: 60000,
     }
@@ -132,12 +171,13 @@ describe("Todo", () => {
       id: "V1StGXR8_Z5jdHi6B-myT",
       projectId: "V1StGXR8_Z5jdHi6B-myT",
       title: "Hello, World!",
-      description: "He was a dark and stormy knight...",
-      taskTime: {
-        start: new Date("1981-10-12T00:00:00.000Z"),
-        end: new Date("1981-10-12T00:01:00.000Z"),
-        duration: 60000,
-      },
+      taskTime: [
+        {
+          start: new Date("1981-10-12T00:00:00.000Z"),
+          end: new Date("1981-10-12T00:01:00.000Z"),
+          duration: 60000,
+        },
+      ],
       lastWorked: new Date("1981-10-12T00:00:00.000Z"),
       totalDuration: 60000,
     }
@@ -151,12 +191,13 @@ describe("Todo", () => {
       id: "V1StGXR8_Z5jdHi6B-myT",
       projectId: "V1StGXR8_Z5jdHi6B-myT",
       title: "Hello, World!",
-      description: "He was a dark and stormy knight...",
-      taskTime: {
-        start: "1981-10-12T00:00:00.000Z",
-        end: "1981-10-12T00:01:00.000Z",
-        duration: 60000,
-      },
+      taskTime: [
+        {
+          start: "1981-10-12T00:00:00.000Z",
+          end: "1981-10-12T00:01:00.000Z",
+          duration: 60000,
+        },
+      ],
       totalDuration: 60000,
       taskStartTime: "2021-10-12T00:00:00.000Z",
     }
@@ -164,12 +205,13 @@ describe("Todo", () => {
       id: "V1StGXR8_Z5jdHi6B-myT",
       projectId: "V1StGXR8_Z5jdHi6B-myT",
       title: "Hello, World!",
-      description: "He was a dark and stormy knight...",
-      taskTime: {
-        start: new Date("1981-10-12T00:00:00.000Z"),
-        end: new Date("1981-10-12T00:01:00.000Z"),
-        duration: 60000,
-      },
+      taskTime: [
+        {
+          start: new Date("1981-10-12T00:00:00.000Z"),
+          end: new Date("1981-10-12T00:01:00.000Z"),
+          duration: 60000,
+        },
+      ],
       totalDuration: 60000,
       taskStartTime: new Date("2021-10-12T00:00:00.000Z"),
     }
