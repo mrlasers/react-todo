@@ -108,13 +108,15 @@ export const Todo = pipe(
     title: C.string,
     taskTime: C.array(TaskTime),
     totalDuration: C.number,
+    lastWorked: MaybeDateString,
+    taskStartTime: MaybeDateString,
   }),
-  C.intersect(
-    C.partial({
-      lastWorked: ISODate,
-      taskStartTime: ISODate,
-    }),
-  ),
+  // C.intersect(
+  //   C.partial({
+  //     lastWorked: ISODate,
+  //     taskStartTime: ISODate,
+  //   }),
+  // ),
 )
 
 export const Project = pipe(
@@ -122,12 +124,13 @@ export const Project = pipe(
     id: ID,
     title: C.string,
     description: C.string,
+    dueDate: MaybeDateString,
   }),
-  C.intersect(
-    C.partial({
-      dueDate: C.nullable(ISODate),
-    }),
-  ),
+  // C.intersect(
+  //   C.partial({
+  //     dueDate: C.nullable(ISODate),
+  //   }),
+  // ),
 )
 
 export const PersistantModel = pipe(
