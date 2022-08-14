@@ -2,6 +2,7 @@
 import './App.scss'
 
 import { differenceInDays, format } from 'date-fns'
+import { differenceInDays as differenceInDaysFP, format as formatFP } from 'date-fns/fp'
 import { guard } from 'fp-ts-std/Function'
 import * as A from 'fp-ts/Array'
 import * as E from 'fp-ts/Either'
@@ -10,30 +11,14 @@ import * as O from 'fp-ts/Option'
 //-- TODO
 import * as C from 'io-ts/Codec'
 import * as D from 'io-ts/Decoder'
-import {
-  ButtonHTMLAttributes,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-} from 'react'
+import { ButtonHTMLAttributes, useEffect, useReducer, useRef, useState } from 'react'
 import { FiClock, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi'
 import Modal from 'react-modal'
 
-import { ID, Model, PersistantModel, Project, Todo } from './codecs'
+import { ID, MaybeDateString as MaybeDate, Model, PersistantModel, Project, Todo } from './codecs'
 import {
-  getDateValue,
-  getProjectTodos,
-  isMatchProjectId,
-  newProject,
-  newTodo,
-  removeTodo,
-  replaceProject,
-  replaceTodo,
-  sortByTitle,
-  startTodoTimer,
-  todoCancelTimer,
-  todoStopTimer,
+    getDateValue, getProjectTodos, isMatchProjectId, newProject, newTodo, removeTodo,
+    replaceProject, replaceTodo, sortByTitle, startTodoTimer, todoCancelTimer, todoStopTimer
 } from './helpers'
 
 Modal.setAppElement("#root")
@@ -118,27 +103,51 @@ export const TodoCard: React.FC<
 
 export const DueDatePicker: React.FC<
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange" | "value"> &
-    CustomOnChange<string> & { value: string | null }
+    CustomOnChange<O.Option<Date>> & { value: MaybeDate }
 > = (props) => {
   const { children, onChange, value, ...attrs } = props
 
   // might want to combine maybeDaysLeft and buttonClassName into one pipe
   // but leaving here for now because i might also want the number of days left
-  const maybeDaysLeft = pipe(
-    O.fromNullable(value),
-    O.map((date) => differenceInDays(new Date(date), new Date(getDateValue()))),
+
+  // const maybeDaysLeft = pipe(
+  //   O.fromNullable(value),
+  //   O.map((date) => differenceInDays(new Date(date), new Date(getDateValue()))),
+  // )
+
+  const className = pipe(
+    value,
+    O.map(
+      flow(
+        differenceInDaysFP(new Date()),
+        guard<number, string>([
+          [(n) => n <= 1, () => "warn"],
+          [(n) => n <= 7, () => "chill"],
+        ])(() => ""),
+      ),
+    ),
   )
 
-  const buttonClassName = pipe(
-    maybeDaysLeft,
-    O.map(
-      guard<number, string>([
-        [(n) => n <= 1, () => "warn"],
-        [(n) => n <= 7, () => "chill"],
-      ])(() => ""),
+  const date = pipe(
+    value,
+    O.map((d) =>
+      d.getFullYear() === new Date().getFullYear()
+        ? format(d, "MMM dd")
+        : format(d, "yyyy-MM-dd"),
     ),
-    O.getOrElse(() => ""),
+    O.getOrElseW(() => ""),
   )
+
+  // const buttonClassName = pipe(
+  //   maybeDaysLeft,
+  //   O.map(
+  //     guard<number, string>([
+  //       [(n) => n <= 1, () => "warn"],
+  //       [(n) => n <= 7, () => "chill"],
+  //     ])(() => ""),
+  //   ),
+  //   O.getOrElse(() => ""),
+  // )
 
   const buttonStyle: React.CSSProperties = { position: "relative" }
 
@@ -155,16 +164,19 @@ export const DueDatePicker: React.FC<
   }
 
   return (
-    <button {...attrs} className={buttonClassName} style={buttonStyle}>
-      <input
-        required
-        value={value ?? ""}
-        type="date"
-        onChange={(e) => onChange?.(e.target.value)}
-        style={inputStyle}
-      />
-      <FiClock /> <span>{value && format(new Date(value), "MMM d")}</span>
-    </button>
+    <>
+      {date && <button onClick={() => onChange?.(O.none)}>X</button>}
+      <button {...attrs} className="none" style={buttonStyle}>
+        <input
+          required
+          value={date}
+          type="date"
+          onChange={(e) => onChange?.(O.some(new Date(e.target.value)))}
+          style={inputStyle}
+        />
+        <FiClock /> <span>{date}</span>
+      </button>
+    </>
   )
 }
 
@@ -265,17 +277,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           />
           <nav>
             <DueDatePicker
-              value={
-                project.dueDate ? format(project.dueDate, "yyyy-MM-dd") : null
+              value={project.dueDate}
+              onChange={(newDate) =>
+                dispatch(
+                  msgUpdateProject({
+                    ...project,
+                    dueDate: newDate,
+                  }),
+                )
               }
-              onChange={flow(
-                (dueDate) => ({ ...project, dueDate: new Date(dueDate) }),
-                msgUpdateProject,
-                dispatch,
-              )}
-            >
-              <FiClock />
-            </DueDatePicker>
+            />
             <button
               title="Delete?"
               onClick={flow(() => msgDeleteProject(project), dispatch)}

@@ -1,10 +1,15 @@
 import { differenceInMilliseconds } from 'date-fns'
 import * as E from 'fp-ts/Either'
-import { flow, identity } from 'fp-ts/lib/function'
+import { flow, identity, pipe } from 'fp-ts/lib/function'
+import * as O from 'fp-ts/Option'
 import { nanoid } from 'nanoid'
 
 import { ID, Model, Project, Todo } from '../codecs'
 import { getRandomName } from './'
+
+export function add(a: number) {
+  return (b: number) => a + b
+}
 
 export function replaceTodo(todos: Todo[], todo: Todo): Todo[] {
   return todos.map((td) => (td.id === todo.id ? todo : td))
@@ -32,7 +37,7 @@ export function startTodoTimer(todos: Todo[], id: ID): Todo[] {
             ? todo
             : {
                 ...todo,
-                taskStartTime: new Date(),
+                taskStartTime: O.some(new Date()),
               },
         identity,
       ),
@@ -45,7 +50,7 @@ export function newProject(): Project {
     id: nanoid(),
     title: getRandomName(),
     description: "",
-    dueDate: null,
+    dueDate: O.none,
   }
 }
 
@@ -56,36 +61,65 @@ export function newTodo(project: Project): Todo {
     projectId: project.id,
     taskTime: [],
     totalDuration: 0,
+    lastWorked: O.none,
+    taskStartTime: O.none,
   }
 }
 
 export function todoCancelTimer(todo: Todo): Todo {
   return {
     ...todo,
-    taskStartTime: undefined,
+    taskStartTime: O.none,
   }
 }
 
 export function todoStopTimer(todo: Todo): Todo {
-  if (!todo.taskStartTime) {
-    return todo
-  }
+  return pipe(
+    todo.taskStartTime,
+    O.map((startTime) => {
+      const endTime = new Date()
+      const duration = differenceInMilliseconds(endTime, startTime)
 
-  const endTime = new Date()
-  const duration = differenceInMilliseconds(endTime, todo.taskStartTime)
+      return {
+        ...todo,
+        taskStartTime: O.none,
+        taskTime: [
+          ...todo.taskTime,
+          {
+            start: startTime,
+            end: endTime,
+            duration: duration,
+          },
+        ],
+        totalDuration: todo.totalDuration + duration,
+        lastWorked: O.some(endTime),
+      }
+    }),
+    O.getOrElse(() => todo),
+  )
 
-  return {
-    ...todo,
-    taskStartTime: undefined,
-    taskTime: [
-      ...todo.taskTime,
-      {
-        start: todo.taskStartTime,
-        end: endTime,
-        duration: duration,
-      },
-    ],
-    totalDuration: todo.totalDuration + duration,
-    lastWorked: endTime,
-  }
+  // if (!todo.taskStartTime) {
+  //   return todo
+  // }
+
+  // const endTime = new Date()
+  // const duration = pipe(
+  //   todo.taskStartTime,
+  //   O.map((startTime) => differenceInMilliseconds(endTime, startTime)),
+  // )
+
+  // return {
+  //   ...todo,
+  //   taskStartTime: undefined,
+  //   taskTime: [
+  //     ...todo.taskTime,
+  //     {
+  //       start: todo.taskStartTime,
+  //       end: endTime,
+  //       duration: duration,
+  //     },
+  //   ],
+  //   totalDuration: todo.totalDuration + duration,
+  //   lastWorked: endTime,
+  // }
 }
