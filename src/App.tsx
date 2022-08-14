@@ -20,6 +20,7 @@ import {
 import { FiClock, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi'
 import Modal from 'react-modal'
 
+import { ID, Model, PersistantModel, Project, Todo } from './codecs'
 import {
   getDateValue,
   getProjectTodos,
@@ -34,7 +35,6 @@ import {
   todoCancelTimer,
   todoStopTimer,
 } from './helpers'
-import { ID, Model, PersistantModel, Project, Todo } from './types'
 
 Modal.setAppElement("#root")
 

@@ -1,20 +1,83 @@
+import { isDate, parse, parseISO } from 'date-fns'
 import * as Dt from 'fp-ts/Date'
+import * as E from 'fp-ts/Either'
+import { pipe } from 'fp-ts/lib/function'
 import * as O from 'fp-ts/Option'
+import * as D from 'io-ts/Decoder'
 
-import { maybeDate, PersistantModel, Project, Todo } from './'
+import {
+  ISODate,
+  maybeCodec,
+  MaybeDateString,
+  MaybeString,
+  PersistantModel,
+  Project,
+  Todo,
+} from './'
 
-it("matches a date", () => {
+it("compares dates properly", () => {
   const date = new Date()
-  const { equals } = O.getEq(Dt.Eq)
-  expect(equals(O.of(date), O.of(date))).toBe(true)
-
-  expect(equals(O.of(date), O.none)).toBe(false)
+  const date2 = new Date(date.toISOString())
+  expect(date).toEqual(date2)
 })
 
-describe("MaybeDate", () => {
-  it("decodes a date", () => {
-    const date = new Date("1981-10-12")
-    expect(maybeDate.decode(date)).toEqualRight(O.of(date))
+describe("maybeCodec", () => {
+  describe("Date", () => {
+    const { decode, encode } = MaybeDateString
+
+    it("encodes/decodes current datetime", () => {
+      const u = new Date().toISOString()
+      expect(
+        pipe(
+          decode(u),
+          E.foldW(() => u, encode),
+        ),
+      ).toEqual(u)
+    })
+
+    it("encodes/decodes 1981-10-12", () => {
+      const u = new Date("1981-10-12").toISOString()
+      expect(
+        pipe(
+          decode(u),
+          E.foldW(() => u, encode),
+        ),
+      ).toEqual(u)
+    })
+
+    it("encodes/decodes a number instead of a date", () => {
+      const u = 1234
+      expect(
+        pipe(
+          decode(u),
+          E.foldW(() => u, encode),
+        ),
+      ).toEqual(null)
+    })
+  })
+
+  describe("string", () => {
+    const { decode, encode } = MaybeString
+
+    it("encodes/decodes 'Hello, World!'", () => {
+      const u = "Hello, World!"
+      expect(
+        pipe(
+          decode(u),
+          E.fold(() => u, encode),
+        ),
+      ).toBe(u)
+    })
+
+    it("encodes/decodes 123 to null", () => {
+      const u = 123
+      expect(
+        pipe(
+          decode(u),
+          E.foldW(() => u, encode),
+        ),
+      ).toBe(null)
+    })
   })
 })
 
