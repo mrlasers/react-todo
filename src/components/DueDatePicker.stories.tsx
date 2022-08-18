@@ -1,15 +1,18 @@
 import * as React from 'react'
 
-import { ComponentMeta as Meta, ComponentStory as Story } from '@storybook/react'
+import {
+  ComponentMeta as Meta,
+  ComponentStory as Story,
+} from '@storybook/react'
 
 import { DueDatePicker, DueDatePickerProps } from './DueDatePicker'
 
 export default {
   component: DueDatePicker,
-  title: 'Button/DueDatePicker',
-  artTypes: {
+  title: "Button/DueDatePicker",
+  argTypes: {
     date: {
-      control: 'date',
+      control: "date",
     },
   },
 } as Meta<typeof DueDatePicker>
